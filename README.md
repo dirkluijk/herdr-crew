@@ -19,9 +19,12 @@ Open http://localhost:5190. You can also run `npx /path/to/herdr-crew --project 
 herdr-crew [serve] [--project DIR] [--port N] [--theme ["free text"]] [--reset-theme] [--theme-avatars] [--no-prompt]
 herdr-crew init [--project DIR] [--plan PLAN.md] [--import personas.json] [--avatars DIR] [--language nl|en] [--port N] [--force]
 herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE] [--avatar KEY] [--traits a,b] [--project DIR]
+herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
 ```
 
 `init` writes `<project>/.herdr-crew.json`. It reads personas from a plan: a back-ticked agent name followed by `(Name, pronouns)`, with the preceding clause ending in a colon as its role. It reads the orchestrator from `` `name`, persona Name (pronouns) `` and message prefixes from sentences such as `start with "Vera here."` or `start with "Vera hier."`. It also reads live Herdr labels in the form `<agent> (<Name>, <pronouns>)`. Use `--import` to add traits, quirk, session, avatar, mascot, lines, statuses, tasks, lead, and role from `personas.json`. `--avatars DIR` matches `<key>.png` by agent name or first name. If the plan says bubbles are Dutch, `init` chooses `nl`. `register` adds or updates a persona (for an existing persona only the changed fields are needed, e.g. `--avatar sjaak`); a running server reloads the config within about four seconds.
+
+`send` is how agents message each other. `herdr agent prompt` pastes text and presses Enter, so a prompt that arrives while the user is typing in that agent's input box is submitted together with the draft. `send` waits until the agent is idle or done and its OpenCode input box is empty, checks again every 2 seconds (`--interval`), and then prompts. It exits 0 when sent, 2 after the timeout (`--timeout`, default 100000 ms) and 1 on other errors. The user can still start typing between the check and the paste; that window is a single Herdr call.
 
 ## Configuration
 
@@ -115,13 +118,19 @@ Browsers keep localStorage per origin, that is per scheme, host and port. Choice
 
 ## Safeguards
 
-Go to focuses an agent with `herdr agent focus`; Zoom toggles `herdr pane zoom --toggle`; Screen reads `herdr agent read --source visible`. Card chat sends on Enter only to idle or done agents and checks status again just before sending. Blocked agents have an Answer dialog for allowlisted keys or text, always with confirmation.
+Go to focuses an agent with `herdr agent focus`; Zoom toggles `herdr pane zoom --toggle`; Screen reads `herdr agent read --source visible`. Card chat sends on Enter only to idle or done agents with an empty input box, and checks both again just before sending; otherwise it answers 409 with the reason. Onboarding messages use the same check. The input box check reads the OpenCode TUI, so prompts to other kinds of agents are refused. Blocked agents have an Answer dialog for allowlisted keys or text, always with confirmation.
 
 The server listens only on `127.0.0.1`. The Host header must be `localhost` or `127.0.0.1` with the port, otherwise the server returns 421 to guard against DNS rebinding. Every POST needs a same-origin Origin header and `X-Crew: 1`; cross-site requests cannot set that header without a preflight, which the server never approves. Persona IDs resolve to live panes on the server. Herdr calls use `execFile`, argument arrays, and a fixed command map. Static files are limited to the page, project avatars, and generated theme avatars. Every action goes into `.herdr-crew/actions.log`. Set `confirm.prompt` to true to require confirmation for chat messages.
 
 ## Agent skill
 
-The draft skill is at [`skills/herdr-crew/SKILL.md`](skills/herdr-crew/SKILL.md). It covers the crew conventions for every agent, and for the orchestrator how to set up and run the dashboard and how to register and brief new agents. It works next to an orchestration skill such as herdr-orchestrator, which only needs one line pointing to it. It is not installed anywhere. Copy it into your agent's skills directory yourself, for example `~/.config/opencode/skills/herdr-crew/`.
+The draft skill is at [`skills/herdr-crew/SKILL.md`](skills/herdr-crew/SKILL.md). It covers the crew conventions for every agent, and for the orchestrator how to set up and run the dashboard and how to register and brief new agents. It works next to an orchestration skill such as herdr-orchestrator, which only needs one line pointing to it. It is not installed anywhere. Install it as a symlink to this checkout, for example for OpenCode:
+
+```sh
+ln -s "$PWD/skills/herdr-crew" ~/.config/opencode/skills/herdr-crew
+```
+
+The skill runs commands through `skills/herdr-crew/crew.mjs`, a launcher that imports `../../server.mjs`. OpenCode reports the symlink path as the skill's base directory, and Node resolves the symlink when it loads the launcher, so the import reaches this checkout and skill changes apply without reinstalling. A copy of the skill has no checkout two levels up, and `node --preserve-symlinks-main` keeps the symlink path; in both cases the launcher fails and you need `node <checkout>/server.mjs`.
 
 ## Environment
 

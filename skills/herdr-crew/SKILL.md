@@ -7,6 +7,12 @@ description: Crew conventions for projects with several coding agents in Herdr a
 
 Check that `HERDR_ENV=1` and that the project or its parent contains `.herdr-crew.json`. If either check fails, these conventions do not apply.
 
+## The herdr-crew command
+
+Run herdr-crew through the launcher in this skill's directory: `node <base>/crew.mjs <command>`, where `<base>` is the path after "Base directory for this skill" in the skill tool output. The commands below write it as `node <base>/crew.mjs`; fill in the real path. `node <base>/crew.mjs help` lists all commands.
+
+The launcher needs the skill installed as a symlink to `skills/herdr-crew` in the herdr-crew checkout. It does not work with `node --preserve-symlinks-main`. With a copy it cannot find the checkout; use `node <checkout>/server.mjs` instead, or the `HERDR_CREW_CLI` value if the dashboard shows one.
+
 ## Your bubble
 
 At the end of every turn, including when you stop to wait or report, set your own bubble:
@@ -21,12 +27,20 @@ Use one sentence of at most 80 characters; Herdr cuts longer token values. Write
 
 Treat messages starting with `[agent-name]` as coming from another agent. Messages starting with the orchestrator's `messagePrefixes`, such as `Vera hier.` or `Vera here.`, come from the orchestrator. Anything else comes from the user. As orchestrator, start every message with your prefix. When reporting to another agent, start with `[your-agent-name]`.
 
-## Persona and tab
-
-Find your persona in `.herdr-crew.json`. Name your Herdr agent `<agent>` and your tab `<agent> (<Name>, <pronouns>)` so the dashboard can match you. Register a missing persona with `herdr-crew register` using the path to `server.mjs` in the herdr-crew checkout, or the `HERDR_CREW_CLI` value if the dashboard shows one:
+Send every message to another agent, including reports, briefings and follow-up work, with `send` instead of `herdr agent prompt`:
 
 ```sh
-node /path/to/herdr-crew/server.mjs register <agent> --name NAME --pronouns P --role ROLE --project DIR
+node <base>/crew.mjs send <agent> '[your-agent-name] <message>' --timeout 110000
+```
+
+`herdr agent prompt` pastes the text and presses Enter. If the user is typing in that agent's input box, your message is glued to their draft and both go out as one. `send` waits until the agent is idle or done and its input box is empty, checks again every 2 seconds, and only then prompts. Exit code 0 means sent. Exit code 2 means it timed out: the reason is on stderr, and you can run the same command again. Exit code 1 means the agent does not exist or the prompt failed. Keep the timeout under your shell tool's limit; the default is 100000 ms. Do not put quotes or apostrophes inside the message.
+
+## Persona and tab
+
+Find your persona in `.herdr-crew.json`. Name your Herdr agent `<agent>` and your tab `<agent> (<Name>, <pronouns>)` so the dashboard can match you. Register a missing persona with the `register` command:
+
+```sh
+node <base>/crew.mjs register <agent> --name NAME --pronouns P --role ROLE --project DIR
 ```
 
 ## Orchestrator
@@ -38,7 +52,7 @@ Only do this when the user asks for a crew dashboard or agrees to your proposal.
 1. Create the config once, from the plan and the live tab labels:
 
    ```sh
-   node /path/to/herdr-crew/server.mjs init --project "$PWD" --plan PLAN.md [--avatars DIR] [--import personas.json]
+   node <base>/crew.mjs init --project "$PWD" --plan PLAN.md [--avatars DIR] [--import personas.json]
    ```
 
    Check the personas in `.herdr-crew.json` (name, pronouns, role, `lead: true` and `messagePrefixes` on your own entry) and fix what `init` guessed wrong. Suggest adding `.herdr-crew/` to `.gitignore`.
@@ -46,7 +60,7 @@ Only do this when the user asks for a crew dashboard or agrees to your proposal.
 
    ```sh
    herdr pane split --current --direction down --cwd "$PWD" --no-focus
-   herdr pane run <new-pane-id> "node /path/to/herdr-crew/server.mjs --project $PWD"
+   herdr pane run <new-pane-id> "node <base>/crew.mjs --project $PWD"
    ```
 
    Read the pane ID from `.result.pane.pane_id`. On the first start the server asks the user for a theme in that pane; let the user answer, do not type it for them.
@@ -62,7 +76,7 @@ When the project has a `.herdr-crew.json`, add these steps to the usual start of
 1. Pick a persona and register it before you start the agent, so its card is ready from the first poll:
 
    ```sh
-   node /path/to/herdr-crew/server.mjs register <agent> --project "$PWD" --name NAME --pronouns P --role ROLE
+   node <base>/crew.mjs register <agent> --project "$PWD" --name NAME --pronouns P --role ROLE
    ```
 
 2. Make the portrait and add it to the persona (see Avatars).
@@ -84,6 +98,6 @@ Include one line in every briefing pointing to this skill. If the agent does not
 
 > Load the herdr-crew skill: set your own Dutch bubble of at most 80 characters at the end of every turn.
 
-When the dashboard asks you to onboard new agents, give each a persona with a name, pronouns, and role; register it; and send the agent a short message with its persona and these conventions. Prompt agents only when they are idle or done.
+When the dashboard asks you to onboard new agents, give each a persona with a name, pronouns, and role; register it; and send the agent a short message with its persona and these conventions through `send` (see Messages).
 
 Do not edit `.herdr-crew/` state files by hand. Do not start, stop, or reconfigure the dashboard unless the user asks.
