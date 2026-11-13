@@ -1,0 +1,296 @@
+#!/usr/bin/env node
+// herdr-crew: a crew dashboard for any project with Herdr agents. Reads Herdr read only; actions only on a click.
+import { createServer } from "node:http";
+import { readFile, writeFile, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { join, dirname, resolve, extname } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createInterface } from "node:readline/promises";
+import { loadConfig, saveConfig, stateDir as makeStateDir, CONFIG_FILE } from "./lib/config.mjs";
+import { createCrew } from "./lib/crew.mjs";
+import { createActions, createGuard, send, readBody } from "./lib/actions.mjs";
+import { createOnboarding, registerPersona } from "./lib/onboarding.mjs";
+import { generateTheme, generateAvatars, imageEndpoint } from "./lib/theme.mjs";
+import { modelEndpoint } from "./lib/summary.mjs";
+import { buildConfig } from "./lib/init.mjs";
+
+const APP = dirname(fileURLToPath(import.meta.url));
+const CLI = `node ${join(APP, "server.mjs")}`;
+const VERSION = JSON.parse(await readFile(join(APP, "package.json"), "utf8")).version;
+
+function parseArgs(argv) {
+  const args = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a.startsWith("--")) { args._.push(a); continue; }
+    const [k, v] = a.slice(2).split("=", 2);
+    if (v !== undefined) args[k] = v;
+    else if (argv[i + 1] !== undefined && !argv[i + 1].startsWith("--")) args[k] = argv[++i];
+    else args[k] = true;
+  }
+  return args;
+}
+
+const HELP = `herdr-crew ${VERSION}
+
+Usage:
+  herdr-crew [serve] [--project DIR] [--port N] [--theme ["free text"]] [--reset-theme] [--theme-avatars] [--no-prompt]
+  herdr-crew init [--project DIR] [--plan PLAN.md] [--import personas.json] [--avatars DIR] [--language nl|en] [--port N] [--force]
+  herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE] [--avatar KEY] [--project DIR]
+
+Config: <project>/${CONFIG_FILE}. State (memory, actions.log, theme avatars): <project>/.herdr-crew/.
+Model features (lead summary, prompted theme) use ANTHROPIC_FOUNDRY_* or ANTHROPIC_API_KEY;
+theme avatars use OPENAI_FOUNDRY_* or OPENAI_API_KEY. Without them everything degrades to defaults.`;
+
+const args = parseArgs(process.argv.slice(2));
+const command = ["init", "register", "serve", "help"].includes(args._[0]) ? args._.shift() : "serve";
+const project = resolve(args.project ?? process.cwd());
+
+if (command === "help" || args.help) {
+  console.log(HELP);
+  process.exit(0);
+}
+
+if (command === "init") {
+  const file = join(project, CONFIG_FILE);
+  if (existsSync(file) && !args.force) {
+    console.error(`${file} exists; use --force to overwrite`);
+    process.exit(1);
+  }
+  const plan = args.plan ? resolve(project, args.plan) : ["PLAN.md", "AGENTS.md"].map((f) => join(project, f)).find(existsSync);
+  const cfg = await buildConfig({
+    project, plan, importFile: args.import ? resolve(project, args.import) : null,
+    avatarDir: args.avatars ?? null, language: args.language, port: args.port ? Number(args.port) : undefined, title: args.title,
+  });
+  await writeFile(file, JSON.stringify(cfg, null, 2) + "\n");
+  console.log(`Wrote ${file} with ${cfg.personas.length} personas${plan ? ` from ${plan}` : ""}.`);
+  process.exit(0);
+}
+
+if (command === "register") {
+  const agent = args._[0];
+  const p = await registerPersona(join(project, CONFIG_FILE), {
+    agent, name: args.name, pronouns: args.pronouns ?? "", role: args.role ?? "", avatar: args.avatar,
+    traits: typeof args.traits === "string" ? args.traits.split(",") : undefined,
+  });
+  if (!p) {
+    console.error("Usage: herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE]  (agent: lowercase Herdr name)");
+    process.exit(1);
+  }
+  console.log(`Registered ${p.agent} as ${p.name}${p.pronouns ? ` (${p.pronouns})` : ""} in ${join(project, CONFIG_FILE)}.`);
+  process.exit(0);
+}
+
+// serve
+const cfg = await loadConfig(project);
+if (!cfg.exists) console.log(`No ${CONFIG_FILE} in ${project}; running with defaults. Try: herdr-crew init`);
+const PORT = Number(args.port ?? process.env.PORT ?? cfg.port);
+const stateDir = await makeStateDir(project);
+const say = (s) => console.log(`[herdr-crew] ${s}`);
+
+// Theme: --reset-theme, --theme "text", --theme (ask), or ask once on the first interactive start.
+async function askTheme() {
+  if (!process.stdin.isTTY || args["no-prompt"]) return null;
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const nl = cfg.language === "nl";
+  const answer = await rl.question(nl
+    ? "Thema voor het dashboard? Vrije tekst, bijvoorbeeld 'retro arcade' of 'ruimtestation'. Enter = standaardthema: "
+    : "Dashboard theme? Free text, for example 'retro arcade' or 'space station'. Enter = default theme: ");
+  rl.close();
+  return answer.trim() || null;
+}
+
+async function applyThemePrompt(prompt) {
+  say(`generating theme: ${prompt}`);
+  const theme = await generateTheme({ prompt, language: cfg.language, project: cfg.title, model: args["theme-model"] ?? cfg.summaries.model });
+  await saveConfig(cfg, { theme, themeAsked: true });
+  say(`theme saved in ${CONFIG_FILE}: ${theme.name}`);
+  return theme;
+}
+
+if (args["reset-theme"]) {
+  await saveConfig(cfg, { theme: null, themeAsked: true });
+  say("theme reset to the default");
+}
+const wantsTheme = typeof args.theme === "string" ? args.theme : args.theme === true || (!cfg.theme && !cfg.themeAsked && !args["reset-theme"]) ? await askTheme() : null;
+if (wantsTheme) {
+  if (!modelEndpoint()) say("no model credentials; keeping the default theme");
+  else await applyThemePrompt(wantsTheme).catch((e) => say(`theme failed, keeping the current one: ${e.message}`));
+} else if (args.theme === true || (!cfg.theme && !cfg.themeAsked && process.stdin.isTTY && !args["no-prompt"])) {
+  await saveConfig(cfg, { themeAsked: true });
+}
+
+let avatarJob = null;
+function startThemeAvatars() {
+  if (!cfg.theme || avatarJob) return false;
+  if (!imageEndpoint()) { say("no image API credentials; theme avatars skipped"); return false; }
+  const theme = cfg.theme;
+  avatarJob = generateAvatars({
+    theme, personas: cfg.personas, dir: stateDir, model: process.env.HERDR_CREW_IMAGE_MODEL ?? "gpt-image-1", log: say,
+    onAvatar: async (agent, file) => {
+      if (cfg.theme !== theme) return;
+      theme.avatars = { ...theme.avatars, [agent]: file };
+      await saveConfig(cfg, { theme });
+    },
+  }).finally(() => { avatarJob = null; });
+  return true;
+}
+if (args["theme-avatars"]) startThemeAvatars();
+
+const avatarUrl = (p) => {
+  const themed = cfg.theme?.avatars?.[p.agent];
+  if (themed && existsSync(join(stateDir, "avatars", themed))) return `theme-avatars/${themed}`;
+  if (p.avatar && cfg.avatarDir && existsSync(join(resolve(project, cfg.avatarDir), `${p.avatar}.png`))) return `avatars/${p.avatar}.png`;
+  return null;
+};
+
+const crew = await createCrew({ project, stateDir, cfg, avatarUrl });
+const guard = createGuard(PORT);
+const onboarding = createOnboarding({ project, cfg, crew, cli: process.env.HERDR_CREW_CLI ?? CLI });
+const actions = createActions({ project, stateDir, cfg, guard, getSnapshot: crew.getSnapshot, onPrompt: crew.notePrompt, onboarding });
+
+// Widgets: "dev-server" loads widgets/dev-server.mjs from this app, a path loads a module relative to the project.
+const widgets = [];
+for (const w of cfg.widgets ?? []) {
+  try {
+    const spec = /^[a-z0-9-]+$/.test(w.module) ? join(APP, "widgets", `${w.module}.mjs`) : resolve(project, w.module);
+    const mod = await import(pathToFileURL(spec).href);
+    widgets.push(mod.default({ project, stateDir, options: w.options ?? {}, language: cfg.language }));
+  } catch (e) {
+    say(`widget ${w.module} not loaded: ${e.message}`);
+  }
+}
+
+// Picks up personas added with `herdr-crew register` or by hand, without a restart.
+let configMtime = existsSync(cfg.file) ? (await stat(cfg.file)).mtimeMs : 0;
+async function reloadConfig() {
+  if (!existsSync(cfg.file)) return;
+  const m = (await stat(cfg.file)).mtimeMs;
+  if (m === configMtime) return;
+  configMtime = m;
+  try {
+    const next = await loadConfig(project);
+    for (const k of ["title", "language", "bubbleLanguage", "personas", "theme", "onboarding", "summaries", "terminalApp", "avatarDir", "confirm"]) cfg[k] = next[k];
+    say("config reloaded");
+  } catch (e) {
+    say(`config not reloaded: ${e.message}`);
+  }
+}
+
+const clients = new Set();
+crew.onSnapshot((snap) => {
+  const payload = `data: ${JSON.stringify(snap)}\n\n`;
+  for (const res of clients) res.write(payload);
+});
+
+function publicConfig() {
+  return {
+    version: VERSION, title: cfg.title, language: cfg.language, bubbleLanguage: cfg.bubbleLanguage, backlog: cfg.backlog,
+    lead: cfg.personas.find((p) => p.lead)?.name ?? null, onboardingVia: cfg.onboarding.via, confirmPrompt: !!cfg.confirm?.prompt,
+    theme: cfg.theme ?? null, themeModel: !!modelEndpoint(), themeAvatars: !!imageEndpoint(), avatarJob: !!avatarJob,
+    widgets: widgets.map((w) => ({ id: w.id, title: w.title })),
+  };
+}
+
+async function handleWidgets(req, res, url) {
+  const m = url.pathname.match(/^\/api\/widgets(?:\/([a-z0-9_-]+)(?:\/([a-z]+))?)?$/);
+  if (!m) return false;
+  const [, id, action] = m;
+  if (!id) {
+    if (req.method !== "GET") return send(res, 405, { error: "method not allowed" }), true;
+    const views = await Promise.all(widgets.map(async (w) => ({ id: w.id, title: w.title, ...(await w.view()) })));
+    return send(res, 200, views), true;
+  }
+  const w = widgets.find((x) => x.id === id);
+  if (!w) return send(res, 404, { error: "unknown widget" }), true;
+  if (req.method === "GET" && action === "log") return send(res, 200, { text: await w.log?.() ?? "" }), true;
+  if (req.method === "GET" && w.actions[action]) return send(res, 200, { confirm: w.actions[action].confirm() }), true;
+  if (req.method !== "POST") return send(res, 405, { error: "method not allowed" }), true;
+  if (!guard.originOk(req)) return send(res, 403, { error: "origin not allowed" }), true;
+  let body;
+  try { body = await readBody(req); } catch { return send(res, 400, { error: "bad body" }), true; }
+  if (!w.actions[action]) return send(res, 404, { error: "unknown action" }), true;
+  if (body.confirmed !== true) return send(res, 400, { error: "not confirmed" }), true;
+  try { await w.actions[action].run(); } catch (e) { return send(res, 409, { error: e.message }), true; }
+  await actions.log(`widget ${w.id}`, action, w.actions[action].confirm());
+  return send(res, 202, { ok: true }), true;
+}
+
+async function handleTheme(req, res, url) {
+  if (url.pathname !== "/api/theme") return false;
+  if (req.method !== "POST") return send(res, 405, { error: "method not allowed" }), true;
+  if (!guard.originOk(req)) return send(res, 403, { error: "origin not allowed" }), true;
+  let body;
+  try { body = await readBody(req); } catch { return send(res, 400, { error: "bad body" }), true; }
+  if (body.confirmed !== true) return send(res, 400, { error: "not confirmed" }), true;
+  if (body.reset === true) {
+    await saveConfig(cfg, { theme: null, themeAsked: true });
+    await actions.log("theme", "reset", "default");
+    return send(res, 200, { theme: null }), true;
+  }
+  if (body.avatars === true) {
+    const started = startThemeAvatars();
+    if (started) await actions.log("theme", "avatars", cfg.theme?.name ?? "");
+    return send(res, started ? 202 : 409, started ? { ok: true } : { error: "no theme, no image API, or a job is running" }), true;
+  }
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 300) : "";
+  if (!prompt) return send(res, 400, { error: "empty theme" }), true;
+  if (!modelEndpoint()) return send(res, 409, { error: "no model credentials on the server" }), true;
+  try {
+    const theme = await applyThemePrompt(prompt);
+    await actions.log("theme", "generate", prompt);
+    return send(res, 200, { theme }), true;
+  } catch (e) {
+    return send(res, 502, { error: e.message }), true;
+  }
+}
+
+const TYPES = { ".html": "text/html; charset=utf-8", ".png": "image/png", ".css": "text/css", ".js": "text/javascript" };
+
+createServer(async (req, res) => {
+  if (!guard.hostOk(req)) {
+    res.writeHead(421);
+    return res.end("wrong host");
+  }
+  const url = new URL(req.url, "http://localhost");
+  try {
+    if (await handleTheme(req, res, url)) return;
+    if (await handleWidgets(req, res, url)) return;
+    if (await actions.handle(req, res, url)) return;
+  } catch (e) {
+    console.error(e);
+    if (!res.headersSent) res.writeHead(500);
+    return res.end();
+  }
+  if (url.pathname === "/events") {
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+    res.write(`data: ${JSON.stringify(crew.getSnapshot())}\n\n`);
+    clients.add(res);
+    req.on("close", () => clients.delete(res));
+    return;
+  }
+  if (url.pathname === "/api/agents") return send(res, 200, crew.getSnapshot());
+  if (url.pathname === "/api/config") return send(res, 200, publicConfig());
+
+  // Static files: the page, project avatars and generated theme avatars. Nothing else from disk.
+  let file = null;
+  const p = url.pathname;
+  if (p === "/" || p === "/index.html") file = join(APP, "public", "index.html");
+  else if (/^\/avatars\/[a-z0-9-]+\.png$/.test(p) && cfg.avatarDir) file = join(resolve(project, cfg.avatarDir), p.slice("/avatars/".length));
+  else if (/^\/theme-avatars\/[a-z0-9-]+\/[a-z0-9_-]+\.png$/.test(p)) file = join(stateDir, "avatars", p.slice("/theme-avatars/".length));
+  if (!file || !existsSync(file)) {
+    res.writeHead(404);
+    return res.end("not found");
+  }
+  res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache" });
+  res.end(await readFile(file));
+}).listen(PORT, "127.0.0.1", () => say(`crew dashboard for ${cfg.title} on http://localhost:${PORT}`));
+
+function loop(fn, ms) {
+  const tick = async () => { try { await fn(); } catch (e) { console.error(e); } setTimeout(tick, ms); };
+  tick();
+}
+loop(crew.pollBacklog, 15000);
+loop(crew.pollHistory, 5 * 60 * 1000);
+loop(async () => { await reloadConfig(); await crew.poll(); }, 4000);
+
