@@ -189,6 +189,19 @@
   .warn { color: var(--done); margin: 0.4rem 0; }
   .err { color: var(--blocked); margin-top: 0.5rem; min-height: 1.2rem; }
   .hint { color: var(--muted); font-size: 0.85rem; }
+  .tools { position: absolute; top: 0.55rem; right: 0.6rem; display: flex; gap: 0.2rem; opacity: 0; transition: opacity .15s; }
+  .card:hover .tools, .card:focus-within .tools, .tools:has(.pin.on) { opacity: 1; }
+  .tools button { width: 1.7rem; height: 1.7rem; padding: 0; border-radius: 8px; border: 1px solid #ffffff22; background: color-mix(in srgb, var(--panel) 80%, var(--ink)); color: var(--ink); font-size: 0.8rem; line-height: 1; }
+  .tools button:hover, .tools button:focus-visible { background: var(--accent); color: var(--bg); outline: none; }
+  .tools .handle { cursor: grab; }
+  .tools .pin.on { background: var(--accent3); color: var(--bg); }
+  .card.lead .tools { display: none; }
+  .card.dragging { opacity: 0.35; }
+  .card.drop-before { box-shadow: -4px 0 0 var(--accent), var(--shadow); }
+  .card.drop-after { box-shadow: 4px 0 0 var(--accent), var(--shadow); }
+  body.dragging #pinned:empty { min-height: 7rem; margin: 0 2rem; border: 2px dashed var(--accent); border-radius: var(--radius); display: grid; place-items: center; }
+  body.dragging #pinned:empty::before { content: attr(data-empty); color: var(--muted); }
+  .grid.drop-end { outline: 2px dashed color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 4px; border-radius: var(--radius); }
   footer { padding: 1rem 2rem 2rem; color: var(--muted); font-size: 0.8rem; }
 </style>
 </head>
@@ -196,11 +209,13 @@
 <header>
   <h1 id="title">Crew</h1>
   <div class="counts" id="counts"></div>
-  <div class="updated" id="updbox"><span id="updated">…</span><button id="themebtn">🎨</button></div>
+  <div class="updated" id="updbox"><span id="updated">…</span><button id="layoutbtn"></button><button id="themebtn">🎨</button></div>
 </header>
 <div class="tagline" id="tagline" style="padding: 0 2rem"></div>
 <div id="banner"></div>
 <div class="hero" id="lead"></div>
+<h2 id="h-pinned"></h2>
+<div class="grid" id="pinned"></div>
 <h2 id="h-new"></h2>
 <div class="grid" id="new"></div>
 <h2 id="h-widgets"></h2>
@@ -236,6 +251,8 @@ const I18N = {
     themeTitle: "Thema", themeHint: "Beschrijf een thema in vrije tekst. Alleen deze tekst en de projectnaam gaan naar het model, en voor avatars ook naam, rol en karakter van de persona's.",
     themeNow: (n) => n ? `Huidig thema: <b>${n}</b>` : "Standaardthema", themeGen: "Genereer", themeReset: "Terug naar standaard", themeAvatars: "Avatars in dit thema", themeBusy: "thema genereren… (kan een halve minuut duren)",
     noModel: "Geen modeltoegang op de server; het standaardthema blijft staan.",
+    pinnedSection: "Vastgepind", pin: "Vastpinnen", unpin: "Losmaken", up: "Naar voren", down: "Naar achteren", drag: "Sleep om te verplaatsen",
+    dropPin: "Sleep een kaartje hierheen om het vast te pinnen", resetLayout: "↺ Indeling", resetLayoutTitle: "Volgorde en pins terugzetten (alleen in deze browser)", resetConfirm: "Volgorde en pins van dit dashboard terugzetten?",
     footer: "Leest Herdr (agents en schermen), OpenCode-sessiegeschiedenis en Backlog.md. ✍️ vult de agent zelf in, 🖥 zijn de laatste schermregels, 🤖 is een samenvatting. Knoppen doen alleen iets na jouw klik; alles komt in .herdr-crew/actions.log.",
   },
   en: {
@@ -261,6 +278,8 @@ const I18N = {
     themeTitle: "Theme", themeHint: "Describe a theme in free text. Only this text and the project name go to the model, plus persona name, role and traits for avatars.",
     themeNow: (n) => n ? `Current theme: <b>${n}</b>` : "Default theme", themeGen: "Generate", themeReset: "Back to default", themeAvatars: "Avatars in this theme", themeBusy: "generating theme… (can take half a minute)",
     noModel: "No model access on the server; the default theme stays.",
+    pinnedSection: "Pinned", pin: "Pin", unpin: "Unpin", up: "Move earlier", down: "Move later", drag: "Drag to move",
+    dropPin: "Drop a card here to pin it", resetLayout: "↺ Layout", resetLayoutTitle: "Reset order and pins (this browser only)", resetConfirm: "Reset the order and pins of this dashboard?",
     footer: "Reads Herdr (agents and screens), OpenCode session history and Backlog.md. ✍️ is set by the agent, 🖥 are the last screen lines, 🤖 is a summary. Buttons only act on your click; everything goes into .herdr-crew/actions.log.",
   },
 };
@@ -349,7 +368,14 @@ function card(a) {
     a.isNew ? `<span class="tag">${esc(L.newTag)}</span>` : "",
     a.live && !a.registered ? `<span class="tag" style="background:var(--done)">${esc(L.unregistered)}</span>` : "",
   ].join("");
-  return `<div class="card ${st} ${a.lead ? "lead" : ""} ${a.mascot ? "mascot" : ""} ${a.isNew ? "new" : ""}" style="--c:${color}">
+  const pinned = layout.pinned.includes(a.id);
+  const tools = a.lead ? "" : `<div class="tools">
+      <button class="handle" draggable="true" data-drag="${esc(a.id)}" title="${esc(L.drag)}" aria-label="${esc(L.drag)}">⠿</button>
+      <button data-move="-1" data-id="${esc(a.id)}" title="${esc(L.up)}" aria-label="${esc(L.up)}: ${esc(a.name)}">↑</button>
+      <button data-move="1" data-id="${esc(a.id)}" title="${esc(L.down)}" aria-label="${esc(L.down)}: ${esc(a.name)}">↓</button>
+      <button class="pin ${pinned ? "on" : ""}" data-pin="${esc(a.id)}" aria-pressed="${pinned}" title="${esc(pinned ? L.unpin : L.pin)}" aria-label="${esc(pinned ? L.unpin : L.pin)}: ${esc(a.name)}">📌</button>
+    </div>`;
+  return `<div class="card ${st} ${a.lead ? "lead" : ""} ${a.mascot ? "mascot" : ""} ${a.isNew ? "new" : ""}" data-card="${esc(a.id)}" style="--c:${color}">${tools}
     <div class="avatar">${pic}<span class="status">${esc(a.mascot && !a.live ? a.mascotStatus : label(st))}</span></div>
     <div>
       <div class="who"><span class="name">${esc(a.name)}</span><span class="pron">${esc(a.pronouns)}</span>${tags}</div>
@@ -444,18 +470,48 @@ function actionsRow(a, st) {
   </div>`;
 }
 
+// Card layout per dashboard instance, kept in this browser only.
+let layout = { order: [], pinned: [] };
+let layoutKey = null;
+let dragging = null;
+let pendingSnap = null;
+function loadLayout() {
+  try {
+    const v = JSON.parse(localStorage.getItem(layoutKey) ?? "null");
+    layout = { order: Array.isArray(v?.order) ? v.order.map(String) : [], pinned: Array.isArray(v?.pinned) ? v.pinned.map(String) : [] };
+  } catch { layout = { order: [], pinned: [] }; }
+}
+function saveLayout() {
+  try { localStorage.setItem(layoutKey, JSON.stringify({ v: 1, ...layout })); } catch {}
+}
+function arrange(list) {
+  const idx = new Map(layout.order.map((id, i) => [id, i]));
+  return list.map((a, i) => ({ a, k: idx.has(a.id) ? idx.get(a.id) : 1e6 + i })).sort((x, y) => x.k - y.k).map((x) => x.a);
+}
+function setOrder(ids) {
+  layout.order = [...ids, ...layout.order.filter((id) => !ids.includes(id))];
+}
+const gridIds = (grid) => [...grid.querySelectorAll(":scope > [data-card]")].map((el) => el.dataset.card);
+
 function render(snap) {
+  if (dragging) { pendingSnap = snap; return; }
   last = Date.now();
   const active = document.activeElement?.dataset?.chat ? document.activeElement : null;
   const focus = active && { id: active.dataset.chat, start: active.selectionStart, end: active.selectionEnd };
   current = snap;
   const agents = snap.agents;
+  const isPinned = (a) => !a.lead && layout.pinned.includes(a.id);
+  const pinned = layout.pinned.map((id) => agents.find((a) => a.id === id && !a.lead)).filter(Boolean);
   const fresh = agents.filter((a) => a.live && a.isNew);
   document.getElementById("lead").innerHTML = agents.filter((a) => a.lead).map(card).join("");
-  document.getElementById("h-new").textContent = fresh.length ? config.theme?.sections?.new ?? L.sections.new : "";
-  document.getElementById("new").innerHTML = fresh.map(card).join("");
-  document.getElementById("live").innerHTML = agents.filter((a) => !a.lead && !a.isNew && (a.live || a.mascot)).map(card).join("");
-  document.getElementById("closed").innerHTML = agents.filter((a) => !a.live && !a.lead && !a.mascot).map(card).join("");
+  document.getElementById("h-pinned").textContent = pinned.length ? L.pinnedSection : "";
+  document.getElementById("pinned").innerHTML = pinned.map(card).join("");
+  document.getElementById("pinned").dataset.empty = L.dropPin;
+  const freshShown = arrange(fresh.filter((a) => !isPinned(a)));
+  document.getElementById("h-new").textContent = freshShown.length ? config.theme?.sections?.new ?? L.sections.new : "";
+  document.getElementById("new").innerHTML = freshShown.map(card).join("");
+  document.getElementById("live").innerHTML = arrange(agents.filter((a) => !a.lead && !a.isNew && (a.live || a.mascot) && !isPinned(a))).map(card).join("");
+  document.getElementById("closed").innerHTML = arrange(agents.filter((a) => !a.live && !a.lead && !a.mascot && !isPinned(a))).map(card).join("");
   const leadName = config.onboardingVia === "orchestrator" ? config.lead : null;
   document.getElementById("banner").innerHTML = fresh.length && leadName
     ? `<div class="banner"><span>${esc(L.banner(fresh.length, leadName))}</span><button data-onboard-all>${esc(L.bannerBtn(leadName))}</button></div>` : "";
@@ -618,6 +674,99 @@ document.addEventListener("click", async (ev) => {
   }
 });
 
+function rerenderKeepFocus(selector) {
+  render(current);
+  document.querySelector(selector)?.focus();
+}
+
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-move], button[data-pin], #layoutbtn");
+  if (!b) return;
+  if (b.id === "layoutbtn") {
+    if (!confirm(L.resetConfirm)) return;
+    layout = { order: [], pinned: [] };
+    saveLayout();
+    return render(current);
+  }
+  if (b.dataset.pin) {
+    const id = b.dataset.pin;
+    layout.pinned = layout.pinned.includes(id) ? layout.pinned.filter((x) => x !== id) : [...layout.pinned, id];
+    saveLayout();
+    return rerenderKeepFocus(`button[data-pin="${CSS.escape(id)}"]`);
+  }
+  const id = b.dataset.id;
+  const grid = b.closest(".grid");
+  const ids = gridIds(grid);
+  const i = ids.indexOf(id);
+  const j = i + Number(b.dataset.move);
+  if (i < 0 || j < 0 || j >= ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  if (grid.id === "pinned") layout.pinned = [...ids, ...layout.pinned.filter((x) => !ids.includes(x))];
+  else setOrder(ids);
+  saveLayout();
+  rerenderKeepFocus(`button[data-move="${b.dataset.move}"][data-id="${CSS.escape(id)}"]`);
+});
+
+// Drag and drop through the handle. Dropping on a pinned card or the pinned area pins; dropping a pinned card
+// in another section unpins it. Moving between other sections is up to the status, so it is ignored.
+function clearDropMarks() {
+  document.querySelectorAll(".drop-before, .drop-after, .drop-end").forEach((el) => el.classList.remove("drop-before", "drop-after", "drop-end"));
+}
+function dropTarget(ev) {
+  const cardEl = ev.target.closest?.("[data-card]");
+  const grid = (cardEl ?? ev.target).closest?.(".grid");
+  if (!grid || !["pinned", "new", "live", "closed"].includes(grid.id)) return null;
+  const from = document.querySelector(`[data-card="${CSS.escape(dragging)}"]`)?.closest(".grid")?.id;
+  if (from !== grid.id && from !== "pinned" && grid.id !== "pinned") return null;
+  if (cardEl && cardEl.dataset.card !== dragging) {
+    const r = cardEl.getBoundingClientRect();
+    return { grid, cardEl, after: ev.clientX > r.left + r.width / 2 };
+  }
+  return { grid, cardEl: null, after: true };
+}
+document.addEventListener("dragstart", (ev) => {
+  const h = ev.target.closest?.("[data-drag]");
+  if (!h) return;
+  dragging = h.dataset.drag;
+  ev.dataTransfer.effectAllowed = "move";
+  ev.dataTransfer.setData("text/plain", dragging);
+  const cardEl = h.closest("[data-card]");
+  ev.dataTransfer.setDragImage(cardEl, 30, 30);
+  requestAnimationFrame(() => cardEl.classList.add("dragging"));
+  document.body.classList.add("dragging");
+});
+document.addEventListener("dragover", (ev) => {
+  if (!dragging) return;
+  const t = dropTarget(ev);
+  clearDropMarks();
+  if (!t) return;
+  ev.preventDefault();
+  if (t.cardEl) t.cardEl.classList.add(t.after ? "drop-after" : "drop-before");
+  else t.grid.classList.add("drop-end");
+});
+document.addEventListener("drop", (ev) => {
+  if (!dragging) return;
+  const t = dropTarget(ev);
+  if (!t) return;
+  ev.preventDefault();
+  const ids = gridIds(t.grid).filter((x) => x !== dragging);
+  const at = t.cardEl ? ids.indexOf(t.cardEl.dataset.card) + (t.after ? 1 : 0) : ids.length;
+  ids.splice(at, 0, dragging);
+  if (t.grid.id === "pinned") layout.pinned = [...ids, ...layout.pinned.filter((x) => !ids.includes(x))];
+  else {
+    layout.pinned = layout.pinned.filter((x) => x !== dragging);
+    setOrder(ids);
+  }
+  saveLayout();
+});
+document.addEventListener("dragend", () => {
+  dragging = null;
+  clearDropMarks();
+  document.body.classList.remove("dragging");
+  render(pendingSnap ?? current);
+  pendingSnap = null;
+});
+
 // Widgets: generic rendering of the view each plugin returns.
 const widgetLog = {};
 let widgetViews = [];
@@ -665,6 +814,11 @@ document.addEventListener("click", async (ev) => {
 
 (async () => {
   applyConfig(await api("api/config"));
+  layoutKey = `herdr-crew:layout:${config.layoutKey ?? location.port}`;
+  loadLayout();
+  const lb = document.getElementById("layoutbtn");
+  lb.textContent = L.resetLayout;
+  lb.title = L.resetLayoutTitle;
   document.getElementById("updated").textContent = L.connecting;
   pollWidgets();
   const es = new EventSource("events");

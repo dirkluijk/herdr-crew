@@ -6,6 +6,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { join, dirname, resolve, extname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createInterface } from "node:readline/promises";
+import { createHash } from "node:crypto";
 import { loadConfig, saveConfig, stateDir as makeStateDir, CONFIG_FILE } from "./lib/config.mjs";
 import { createCrew } from "./lib/crew.mjs";
 import { createActions, createGuard, send, readBody } from "./lib/actions.mjs";
@@ -186,9 +187,12 @@ crew.onSnapshot((snap) => {
   for (const res of clients) res.write(payload);
 });
 
+// Layout in the browser is stored per dashboard instance: project (id or real path) plus port.
+const LAYOUT_KEY = `${typeof cfg.id === "string" && /^[\w.-]{1,64}$/.test(cfg.id) ? cfg.id : createHash("sha1").update(realpathSync(project)).digest("hex").slice(0, 12)}:${PORT}`;
+
 function publicConfig() {
   return {
-    version: VERSION, title: cfg.title, language: cfg.language, bubbleLanguage: cfg.bubbleLanguage, backlog: cfg.backlog,
+    version: VERSION, title: cfg.title, layoutKey: LAYOUT_KEY, language: cfg.language, bubbleLanguage: cfg.bubbleLanguage, backlog: cfg.backlog,
     lead: cfg.personas.find((p) => p.lead)?.name ?? null, onboardingVia: cfg.onboarding.via, confirmPrompt: !!cfg.confirm?.prompt,
     theme: cfg.theme ?? null, themeModel: !!modelEndpoint(), themeAvatars: !!imageEndpoint(), avatarJob: !!avatarJob,
     widgets: widgets.map((w) => ({ id: w.id, title: w.title })),

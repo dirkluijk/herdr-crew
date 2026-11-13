@@ -27,6 +27,7 @@ herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE] [--avatar K
 
 | Key | Meaning |
 | --- | --- |
+| `id` | Optional stable project id for the browser layout key; defaults to a hash of the project path. |
 | `title` | Dashboard title. |
 | `language` | UI language, `nl` or `en`. |
 | `bubbleLanguage` | Language for agent speech bubbles. |
@@ -54,6 +55,8 @@ herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE] [--avatar K
 | `mascot` | A made-up colleague without a session, with rotating `lines[]` and `statuses[]`; no model calls. |
 
 The dashboard reads live `working`, `idle`, `done`, and `blocked` status from `herdr agent list`. Cards show an agent's own Herdr `say` token as a speech bubble (`✍️ own words`), greyed as the previous turn when work resumes. If there is no bubble, the card can show the last visible screen lines (`🖥 screen`). It also shows the latest incoming message and its sender: a `[agent-name]` prefix, a persona's `messagePrefixes`, or `You`. The OpenCode footer supplies a context bar, yellow from 70 percent and red from 85 percent. Closed agents appear greyed with their last words. Cards show tasks. An optional lead summary (`🤖`) needs `ANTHROPIC_FOUNDRY_API_KEY` and `ANTHROPIC_FOUNDRY_BASE_URL`, or `ANTHROPIC_API_KEY`.
+
+Drag a card by its handle (⠿) to change the order, or use the ↑ and ↓ buttons, which also work from the keyboard. 📌 pins a card: pinned cards get their own section at the top, so new agents and status changes do not move them. Dropping a card on the pinned section pins it; dragging a pinned card back to its section unpins it. The layout lives in the browser's localStorage under `herdr-crew:layout:<project>:<port>`, where `<project>` is `id` from `.herdr-crew.json` or a short hash of the project path, so several dashboards on one machine keep their own layout. Cards without a stored position follow the ordered ones. The ↺ button in the header resets the layout.
 
 State lives in `<project>/.herdr-crew/`: `memory.json` (recent bubbles, incoming messages, context use), `actions.log`, widget logs, and generated theme avatars. Add `.herdr-crew/` to the project's `.gitignore`.
 
