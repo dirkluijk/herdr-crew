@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@m5-panels'
 created_date: '2026-11-13 13:19'
-updated_date: '2026-11-13 13:29'
+updated_date: '2026-11-13 13:30'
 labels:
   - ui
   - actions
@@ -51,6 +51,8 @@ Implemented on feat/panels, commit e5db88d.
 - actions.log: close with tab, label, session, cwd; reopen with workspace, tab, pane, label, cwd, session.
 - Test stubs: herdr stub reads HERDR_CREW_TEST_STATE (status, panes, startFail, createNoPane, extraAgents) and answers tab get, tab create and agent get with session and cwd; new stub opencode so a stored session never reaches the real OpenCode.
 Validation: npm test 159/159 (twice), npm run check ok. test/agents.test.mjs: close sequence and stored fields, refusals (lead, working, blocked, other pane or name, 2 panes, unknown pane count, failed tab close), unregistered and non-OpenCode close, reopen sequence and label, fallback label and project cwd, refusals (no or bad session, unknown persona, name live elsewhere, list failure, cwd outside, symlink out, missing dir, no workspace), failed start closes the tab, missing pane id, one action at a time, allowedCwd with worktrees. server.test.mjs: route guards (403, 400), close refusals and success with stored session and log, lead refused, reopen refused for live and sessionless agents, success command sequence and log, failed start cleanup. Manual: own instance on 5277 with the stub herdr on PATH (no real Herdr calls), headless Chrome: Close and Reopen buttons on the right cards, both confirm dialogs, toasts, stub log shows tab close, tab create and agent start, actions.log lines and the stored session in the persona. No real agents were closed or started.
+
+crew-orch 2026-11-13: reviewed, rebased onto main, npm test 159 pass, fast-forward merged as 43ed8a2 and pushed; restarted 5192 and 5190 (both 200). Closed personas from before CREW-18 have no stored session, so canReopen is false for them.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
