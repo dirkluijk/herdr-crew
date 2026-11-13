@@ -1,10 +1,11 @@
 ---
 id: CREW-17
 title: Agents briefed by the orchestrator show up as new
-status: To Do
+status: Done
 assignee:
   - '@crew-orch'
 created_date: '2026-11-13 12:40'
+updated_date: '2026-11-13 12:41'
 labels:
   - bug
 dependencies: []
@@ -19,7 +20,25 @@ A registered agent counted as new (isNew in lib/crew.mjs) until it set its first
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A registered agent whose last incoming screen message came from the lead persona counts as informed (informedVia briefing)
-- [ ] #2 Unregistered agents and messages from others or the dashboard keep the old behaviour
-- [ ] #3 Unit tests cover the rule; npm test passes
+- [x] #1 A registered agent whose last incoming screen message came from the lead persona counts as informed (informedVia briefing)
+- [x] #2 Unregistered agents and messages from others or the dashboard keep the old behaviour
+- [x] #3 Unit tests cover the rule; npm test passes
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Add briefedByLead in lib/crew.mjs, mark mem informedAt with informedVia briefing during the poll, unit tests in test/crew.test.mjs.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Fixed on main by crew-orch in f8fad82. npm test 114 pass, npm run check ok.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Registered agents briefed by the lead persona now count as informed, so the new agent banner no longer shows for agents the orchestrator registered and briefed. Covered by test/crew.test.mjs.
+<!-- SECTION:FINAL_SUMMARY:END -->

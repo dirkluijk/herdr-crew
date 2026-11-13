@@ -1,11 +1,11 @@
 ---
 id: CREW-16
 title: 'Add panel button: ask the orchestrator for a project panel'
-status: Done
+status: To Do
 assignee:
   - '@m5-panels'
 created_date: '2026-11-13 12:37'
-updated_date: '2026-11-13 12:40'
+updated_date: '2026-11-13 12:41'
 labels:
   - widgets
   - ui
@@ -25,27 +25,9 @@ User idea 2026-11-13: a default Add panel button in the dashboard header where t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 The header has an Add panel button; a confirmed prompt reaches the live lead persona through the draft guard, or the dialog explains why not
-- [x] #2 herdr-crew widget add and widget remove validate entries and update .herdr-crew.json
-- [x] #3 The herdr-crew skill tells the orchestrator how to turn a panel request into a widget entry
+- [ ] #1 The header has an Add panel button; a confirmed prompt reaches the live lead persona through the draft guard, or the dialog explains why not
+- [ ] #2 herdr-crew widget add and widget remove validate entries and update .herdr-crew.json
+- [ ] #3 The herdr-crew skill tells the orchestrator how to turn a panel request into a widget entry
 - [ ] #4 End to end: a prompt for a backlog overview and one for a link to PLAN.md each result in a working panel without restart
 - [ ] #5 Tests cover the action, the CLI validation and the message template; npm test and npm run check pass
 <!-- AC:END -->
-
-## Implementation Plan
-
-<!-- SECTION:PLAN:BEGIN -->
-Add briefedByLead in lib/crew.mjs, mark mem informedAt with informedVia briefing during the poll, unit tests in test/crew.test.mjs.
-<!-- SECTION:PLAN:END -->
-
-## Implementation Notes
-
-<!-- SECTION:NOTES:BEGIN -->
-Fixed on main by crew-orch. npm test 114 pass, npm run check ok.
-<!-- SECTION:NOTES:END -->
-
-## Final Summary
-
-<!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Registered agents briefed by the lead persona now count as informed, so the new agent banner no longer shows for agents the orchestrator registered and briefed. Covered by test/crew.test.mjs.
-<!-- SECTION:FINAL_SUMMARY:END -->
