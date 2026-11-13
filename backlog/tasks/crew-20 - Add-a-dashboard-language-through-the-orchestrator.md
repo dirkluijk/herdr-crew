@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@m5-panels'
 created_date: '2026-11-13 13:22'
-updated_date: '2026-11-13 15:05'
+updated_date: '2026-11-13 15:06'
 labels:
   - i18n
   - skill
@@ -51,6 +51,8 @@ Commit 09f019a on feat/panels.
 Validation: npm test 173/173, npm run check ok. test/languages.test.mjs (file check, add refusals and update, project language in i18n, request text). server.test.mjs: locale check and add through the CLI, de offered in /api/config without restart and selectable, request guards, no lead 409, with lead the previewed text goes through the draft guard, actions.log line.
 End to end (AC 4): own instance on 5277 run from a copy of the worktree inside a throwaway project (so en.json is inside the test lead cwd), own test lead m5-testlead (Lotte) in its own tab, not crew-orch. Requested Duits through 🌐, Taal toevoegen, confirm: Lotte wrote the draft, locale check passed first time, locale add stored de.json (about 1 minute). The picker then listed Deutsch (de, dit project); choosing it switched the page to German without restart (Die e2e-lang-Crew, arbeitet, wartet, footer and Close dialog in German), bubbleLanguage stayed nl, actions.log has language request and language set. Test tab closed, instance stopped.
 Incident during the manual check: my scripted step opened the Close dialog on the first card with a Close button, which in that instance was Noor (crew-orch, shown as unregistered in the test project). The script cancelled the dialog; no request was sent, actions.log has no close line and crew-orch stayed live. Future scripted checks should target a card by agent id.
+
+crew-orch 2026-11-13: rebased onto main, npm test 173 pass, fast-forward merged as d7511e0 and pushed; restarted 5192 and 5190. Follow-ups from review: the Close incident shows that a dashboard can offer Close for unregistered agents of another project in the same Herdr workspace (CREW-22), and project languages live in .herdr-crew/locales, which is gitignored, so they are not versioned with the project (decision pending).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
