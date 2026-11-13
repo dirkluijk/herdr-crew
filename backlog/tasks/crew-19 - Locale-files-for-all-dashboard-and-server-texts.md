@@ -4,11 +4,12 @@ title: Locale files for all dashboard and server texts
 status: To Do
 assignee: []
 created_date: '2026-11-13 13:22'
+updated_date: '2026-11-13 13:25'
 labels:
   - i18n
   - ui
 dependencies:
-  - CREW-18
+  - CREW-21
 priority: medium
 ordinal: 19000
 ---
