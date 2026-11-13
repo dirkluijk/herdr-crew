@@ -40,7 +40,7 @@ herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
 | `workspace` | Optional Herdr workspace ID. Otherwise use `HERDR_WORKSPACE_ID` or the workspace where most agents have their cwd in the project. |
 | `backlog` | True when `backlog/` or `.backlog/` exists. Shows Backlog.md tasks per persona via `backlog task list --json` and task modals. |
 | `avatarDir` | Directory for persona avatars. |
-| `terminalApp` | macOS app to bring to the front after Go to, for example Alacritty. |
+| `terminalApp` | macOS app to bring to the front after Go to, for example Alacritty. `init` detects it from the terminal that started Herdr (`__CFBundleIdentifier`, variables such as `ALACRITTY_SOCKET` or `KITTY_WINDOW_ID`, then `TERM_PROGRAM`), or takes `HERDR_CREW_TERMINAL`. Without it, Go to only focuses the pane in Herdr. |
 | `summaries` | `{ "lead": true, "model": ... }` for an optional lead summary. |
 | `onboarding` | `via` is `"orchestrator"` (default) or `"direct"`; `message` is `null` or a template. Templates can use `{project}`, `{agent}`, `{persona}`, `{language}`, `{lead}`, and `{prefix}`. |
 | `confirm` | `{ "prompt": false }`; set `prompt` to true to confirm chat messages. |
@@ -137,7 +137,7 @@ The skill runs commands through `skills/herdr-crew/crew.mjs`, a launcher that im
 | Variable | Use |
 | --- | --- |
 | `HERDR_WORKSPACE_ID` | Workspace fallback when `workspace` is absent. |
-| `HERDR_CREW_TERMINAL` | Used by `init` for `terminalApp`. |
+| `HERDR_CREW_TERMINAL` | Used by `init` for `terminalApp`, before detection. |
 | `HERDR_CREW_CLI` | Command shown in onboarding messages; defaults to `node <path>/server.mjs`. |
 | `HERDR_CREW_IMAGE_MODEL` | Image model; defaults to `gpt-image-1`. |
 | `PORT` | Server port. |

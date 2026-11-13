@@ -67,7 +67,7 @@ before(async () => {
     });
   `);
   await writeFile(join(project, ".herdr-crew.json"), JSON.stringify({
-    title: "http-test", workspace: "w99", backlog: false, themeAsked: true, theme: { name: "keep" },
+    title: "http-test", workspace: "w99", backlog: false, themeAsked: true, theme: { name: "keep" }, terminalApp: "FakeTerm",
     personas: [{ agent: "m9-probe", name: "Probe", pronouns: "it", role: "test", tasks: [] }],
     widgets: [
       { module: "links", options: { links: [
@@ -236,6 +236,36 @@ test("send: times out on a draft with exit 2, sends to an empty box", async () =
   assert.equal(r.code, 0, r.out);
   assert.deepEqual((await prompts()).at(-1), ["agent", "prompt", "m9-probe", "[m3-skill] CREW-10: done."]);
   assert.equal((await cli("m9-probe")).code, 1);
+});
+
+const actionLog = async () => (await readFile(join(project, ".herdr-crew", "actions.log"), "utf8")).trim().split("\n").map((l) => l.split("\t"));
+
+test("dashboard: Go to focuses the pane, raises the terminal app on macOS and is logged", async () => {
+  const r = await api("/api/agents/m9-probe/focus", { method: "POST", headers: ok(), body: {} });
+  assert.equal(r.status, 200);
+  const mac = process.platform === "darwin";
+  assert.deepEqual(JSON.parse(r.text), { ok: true, terminalApp: "FakeTerm", raised: mac ? true : null });
+  const calls = await herdrCalls();
+  assert.deepEqual(calls.filter((a) => a[1] === "focus"), [["agent", "focus", "w99:p1"]]);
+  assert.deepEqual(calls.filter((a) => a[0] === "open"), mac ? [["open", "-a", "FakeTerm"]] : []);
+  const last = (await actionLog()).at(-1);
+  assert.equal(last[1], "m9-probe (Probe, w99:p1)");
+  assert.equal(last[2], "focus");
+  assert.deepEqual(JSON.parse(last[3]), { ok: true, terminalApp: "FakeTerm", raised: mac ? true : null });
+});
+
+test("dashboard: Go to without terminalApp says so in the response and the log", async () => {
+  const file = join(project, ".herdr-crew.json");
+  const cfg = JSON.parse(await readFile(file, "utf8"));
+  delete cfg.terminalApp;
+  await writeFile(file, JSON.stringify(cfg));
+  let body;
+  for (const until = Date.now() + 10000; Date.now() < until; await new Promise((res) => setTimeout(res, 250))) {
+    body = JSON.parse((await api("/api/agents/m9-probe/focus", { method: "POST", headers: ok(), body: {} })).text);
+    if (body.terminalApp === null) break;
+  }
+  assert.deepEqual(body, { ok: true, terminalApp: null, raised: null });
+  assert.deepEqual(JSON.parse((await actionLog()).at(-1)[3]), { ok: true, terminalApp: null, raised: null });
 });
 
 test("dashboard: a confirmed widget action with the right headers runs", async () => {

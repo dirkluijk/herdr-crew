@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { personasFromPlan } from "../lib/init.mjs";
+import { personasFromPlan, detectTerminalApp } from "../lib/init.mjs";
 
 const PLAN = `# Plan
 
@@ -46,4 +46,24 @@ test("a lead without prefixes gets a default prefix", () => {
 
 test("an empty plan gives no personas", () => {
   assert.deepEqual(personasFromPlan(""), []);
+});
+
+test("detectTerminalApp: the outer terminal is found inside Herdr on macOS", () => {
+  const herdr = { TERM_PROGRAM: "herdr", TERM: "xterm-256color" };
+  assert.equal(detectTerminalApp({ ...herdr, __CFBundleIdentifier: "org.alacritty", ALACRITTY_SOCKET: "/tmp/s" }, "darwin"), "Alacritty");
+  assert.equal(detectTerminalApp({ ...herdr, __CFBundleIdentifier: "com.googlecode.iterm2" }, "darwin"), "iTerm");
+  assert.equal(detectTerminalApp({ ...herdr, ALACRITTY_WINDOW_ID: "1" }, "darwin"), "Alacritty");
+  assert.equal(detectTerminalApp({ ...herdr, KITTY_WINDOW_ID: "1" }, "darwin"), "kitty");
+  assert.equal(detectTerminalApp({ ...herdr, GHOSTTY_RESOURCES_DIR: "/x" }, "darwin"), "Ghostty");
+  assert.equal(detectTerminalApp({ TERM_PROGRAM: "Apple_Terminal" }, "darwin"), "Terminal");
+  assert.equal(detectTerminalApp({ TERM_PROGRAM: "WezTerm" }, "darwin"), "WezTerm");
+});
+
+test("detectTerminalApp: HERDR_CREW_TERMINAL wins, unknown terminals and other platforms give null", () => {
+  assert.equal(detectTerminalApp({ HERDR_CREW_TERMINAL: "Ghostty", __CFBundleIdentifier: "org.alacritty" }, "darwin"), "Ghostty");
+  assert.equal(detectTerminalApp({ HERDR_CREW_TERMINAL: "Ghostty" }, "linux"), "Ghostty");
+  assert.equal(detectTerminalApp({ TERM_PROGRAM: "herdr" }, "darwin"), null);
+  assert.equal(detectTerminalApp({ TERM_PROGRAM: "tmux", __CFBundleIdentifier: "com.example.unknown" }, "darwin"), null);
+  assert.equal(detectTerminalApp({ TERM_PROGRAM: "vscode" }, "darwin"), null);
+  assert.equal(detectTerminalApp({ __CFBundleIdentifier: "org.alacritty", ALACRITTY_SOCKET: "/tmp/s" }, "linux"), null);
 });

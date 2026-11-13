@@ -1,0 +1,5 @@
+#!/usr/bin/env node
+// Stub for macOS open in tests, so Go to never brings a real app to the front. Logs its arguments.
+import { appendFileSync } from "node:fs";
+
+if (process.env.HERDR_CREW_TEST_LOG) appendFileSync(process.env.HERDR_CREW_TEST_LOG, JSON.stringify(["open", ...process.argv.slice(2)]) + "\n");
