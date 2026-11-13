@@ -203,6 +203,8 @@
   body.dragging #pinned:empty::before { content: attr(data-empty); color: var(--muted); }
   .grid.drop-end { outline: 2px dashed color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 4px; border-radius: var(--radius); }
   footer { padding: 1rem 2rem 2rem; color: var(--muted); font-size: 0.8rem; }
+  #toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); max-width: min(640px, 92vw); padding: 0.7rem 1rem; border-radius: 12px; background: var(--bubble); color: var(--bubbleInk); border-left: 4px solid var(--done); box-shadow: 0 10px 30px #0008; font-size: 0.9rem; z-index: 10; }
+  #toast[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -225,6 +227,7 @@
 <h2 id="h-closed"></h2>
 <div class="grid" id="closed"></div>
 <dialog id="modal"></dialog>
+<div id="toast" role="status" aria-live="polite" hidden></div>
 <footer id="footer"></footer>
 <script>
 const I18N = {
@@ -236,6 +239,7 @@ const I18N = {
     noWords: "Geen laatste woorden bewaard.", thinking: "denkt na", orchestrator: "👑 orchestrator", mascot: "🌰 mascotte", legend: "geen sessie, wel een legende",
     newTag: "nieuw", unregistered: "niet geregistreerd", informed: (via) => `geïnformeerd${via === "orchestrator" ? " via de orchestrator" : ""}`,
     by: { self: ["✍️ eigen woorden", "Door de agent zelf ingevuld"], stale: ["✍️ vorige beurt", "Eigen woorden van de vorige beurt"], screen: ["🖥 scherm", "Laatste schermregels, geen eigen wolkje"], summary: ["🤖 samengevat", "Samengevat door een model"], mascot: ["🌰 oneliner", "Wisselende oneliner"] },
+    noTerminal: "Pane staat vooraan in Herdr, maar de terminal komt niet naar voren: zet terminalApp in .herdr-crew.json (bijv. Alacritty).", openFailed: (n) => `terminalApp ${n} kon niet geopend worden; klopt de naam in .herdr-crew.json?`,
     goTo: "↗ Ga naar", zoom: "⤢ Zoom", screen: "▤ Scherm", answer: "⚠ Beantwoord dialoog", inform: "👋 Informeer", register: "📝 Registreer",
     chatPh: (n) => `Bericht aan ${n} (Enter verstuurt, Shift+Enter is nieuwe regel)`, chatBlocked: (n) => `${n} wacht op een dialoog, gebruik Beantwoord dialoog`, chatBusy: (n) => `${n} is aan het werk, even wachten…`,
     sending: "versturen…", you: "Jij", viaDash: "via dashboard", context: "context", soon: "compaction nabij, handover nu", prep: "handover voorbereiden",
@@ -263,6 +267,7 @@ const I18N = {
     noWords: "No last words kept.", thinking: "thinking", orchestrator: "👑 orchestrator", mascot: "🌰 mascot", legend: "no session, still a legend",
     newTag: "new", unregistered: "not registered", informed: (via) => `informed${via === "orchestrator" ? " via the orchestrator" : ""}`,
     by: { self: ["✍️ own words", "Set by the agent itself"], stale: ["✍️ previous turn", "Own words from the previous turn"], screen: ["🖥 screen", "Last screen lines, no own bubble"], summary: ["🤖 summary", "Summarised by a model"], mascot: ["🌰 one-liner", "Rotating one-liner"] },
+    noTerminal: "Focused the pane in Herdr, but the terminal stays behind: set terminalApp in .herdr-crew.json (for example Alacritty).", openFailed: (n) => `Could not open terminalApp ${n}; is the name in .herdr-crew.json right?`,
     goTo: "↗ Go to", zoom: "⤢ Zoom", screen: "▤ Screen", answer: "⚠ Answer dialog", inform: "👋 Inform", register: "📝 Register",
     chatPh: (n) => `Message to ${n} (Enter sends, Shift+Enter for a new line)`, chatBlocked: (n) => `${n} waits on a dialog, use Answer dialog`, chatBusy: (n) => `${n} is working, hold on…`,
     sending: "sending…", you: "You", viaDash: "via dashboard", context: "context", soon: "compaction close, hand over now", prep: "prepare a handover",
@@ -623,6 +628,21 @@ const agentById = (id) => current.agents.find((a) => a.id === id);
 const who = (a) => `${a.name} (${a.id}, ${a.pane})`;
 function showModal(html) { modal.innerHTML = html; if (!modal.open) modal.showModal(); }
 
+const toast = document.getElementById("toast");
+let toastTimer = null;
+function showToast(text) {
+  toast.textContent = text;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (toast.hidden = true), 6000);
+}
+// The no-terminal hint shows once per page load; a failed open shows every time.
+let noTerminalShown = false;
+function focusHint(r) {
+  if (r.raised === false) showToast(L.openFailed(r.terminalApp));
+  else if (r.ok && r.terminalApp === null && !noTerminalShown) { noTerminalShown = true; showToast(L.noTerminal); }
+}
+
 async function openTask(id) {
   showModal(`<h3>${esc(id)}</h3><pre>${L.loading}</pre><div class="row"><button data-close>${L.close}</button></div>`);
   try { modal.querySelector("pre").textContent = (await api(`api/tasks/${encodeURIComponent(id)}`)).text; } catch (e) { modal.querySelector("pre").textContent = e.message; }
@@ -741,7 +761,10 @@ document.addEventListener("click", async (ev) => {
   if (act === "register") return openRegister(a);
   if (act === "focus" || act === "zoom") {
     t.disabled = true;
-    try { await api(`api/agents/${encodeURIComponent(a.id)}/${act}`, {}); } catch (e) { alert(e.message); }
+    try {
+      const r = await api(`api/agents/${encodeURIComponent(a.id)}/${act}`, {});
+      if (act === "focus") focusHint(r);
+    } catch (e) { alert(e.message); }
     t.disabled = false;
   }
 });
