@@ -1,10 +1,11 @@
 ---
 id: CREW-18
 title: Close and reopen agents from the dashboard
-status: To Do
+status: In Progress
 assignee:
   - '@m5-panels'
 created_date: '2026-11-13 13:19'
+updated_date: '2026-11-13 13:20'
 labels:
   - ui
   - actions
@@ -28,3 +29,13 @@ User request 2026-11-13: close agents from the dashboard and reopen them later. 
 - [ ] #5 Every close and reopen is confirmed and logged in actions.log; README documents both
 - [ ] #6 Tests cover the guards and the command sequence with stub herdr; npm test and npm run check pass
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. validPersona accepts optional session (ses_ id) and cwd (absolute path), so registerPersona can store them; config stays compatible.
+2. lib/agents.mjs (new): closeAgent and reopenAgent with a fixed herdr command map through execFile. Close: lead refused; fresh herdr agent get (same pane and name, idle or done); herdr tab get pane_count must be 1; store session and cwd for registered personas (opencode with a ses_ id only); herdr tab close. Reopen: registered persona with a valid ses_ id; name not live anywhere (fresh herdr agent list); cwd = stored cwd or the project, must be the project, inside it, or inside a git worktree of the project (git worktree list --porcelain); crew workspace known; herdr tab create with the same label, root pane from .result.root_pane.pane_id, herdr agent start <agent> --kind opencode --pane <pane> --timeout 60000 -- --session <ses>; on a failed start close the new tab. One action per agent at a time.
+3. Routes POST /api/agents/<id>/close and /reopen with Host, Origin, X-Crew, confirmed, actions.log; snapshot gets canClose hints and canReopen for closed cards.
+4. Page: Close on live non-lead idle or done cards, Reopen on closed cards with a session, both through a confirm dialog.
+5. Stub herdr with a state file (status, pane count, start failure, extra live agents) and a stub opencode; tests for guards and command sequences. README.
+<!-- SECTION:PLAN:END -->
