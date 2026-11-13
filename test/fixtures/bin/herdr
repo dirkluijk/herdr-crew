@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+// Stub for the herdr CLI in tests: one idle agent, and every call is logged so tests can see what ran.
+import { appendFileSync } from "node:fs";
+
+const args = process.argv.slice(2);
+if (process.env.HERDR_CREW_TEST_LOG) appendFileSync(process.env.HERDR_CREW_TEST_LOG, JSON.stringify(args) + "\n");
+const out = (result) => console.log(JSON.stringify({ result }));
+const [group, cmd] = args;
+
+if (group === "agent" && cmd === "list") {
+  out({ agents: [{ name: "m9-probe", pane_id: "w99:p1", tab_id: "w99:t1", workspace_id: "w99", agent_status: "idle", terminal_title: "OC | probe", cwd: process.env.HERDR_CREW_TEST_PROJECT }] });
+} else if (group === "tab" && cmd === "list") {
+  out({ tabs: [{ tab_id: "w99:t1", label: "m9-probe (Probe, it)" }] });
+} else if (group === "agent" && cmd === "read") {
+  out({ text: "" });
+} else if (group === "agent" && cmd === "get") {
+  out({ agent: { agent_status: "idle" } });
+} else {
+  out({});
+}

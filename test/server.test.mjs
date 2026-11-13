@@ -1,0 +1,260 @@
+// Starts its own dashboard on free ports (never 5190 to 5193) against a temporary project, with stub herdr
+// and backlog commands on PATH, so the tests never reach a live Herdr server or a real project.
+import { test, before, after } from "node:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { request } from "node:http";
+import { createServer } from "node:net";
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, unlink } from "node:fs/promises";
+import { existsSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, dirname, delimiter } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const APP = join(dirname(fileURLToPath(import.meta.url)), "..");
+const RESERVED = new Set([5190, 5191, 5192, 5193]);
+
+async function freePort(taken) {
+  for (;;) {
+    const port = await new Promise((res, rej) => {
+      const s = createServer().once("error", rej).listen(0, "127.0.0.1", () => {
+        const { port } = s.address();
+        s.close(() => res(port));
+      });
+    });
+    if (!RESERVED.has(port) && !taken.includes(port)) return port;
+  }
+}
+
+function http(port, path, { method = "GET", headers = {}, body, host = `localhost:${port}` } = {}) {
+  return new Promise((res, rej) => {
+    const data = body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body);
+    const opts = host === null ? { setHost: false, headers } : { headers: { host, ...headers } };
+    const req = request({ host: "127.0.0.1", port, path, method, ...opts }, (r) => {
+      const chunks = [];
+      r.on("data", (c) => chunks.push(c));
+      r.on("end", () => res({ status: r.statusCode, headers: r.headers, text: Buffer.concat(chunks).toString("utf8") }));
+    });
+    req.on("error", rej);
+    req.end(data);
+  });
+}
+
+let root, project, port, filesPort, server, herdrLog;
+const output = [];
+const ok = () => ({ origin: `http://localhost:${port}`, "x-crew": "1", "content-type": "application/json" });
+const api = (path, opts) => http(port, path, opts);
+const files = (path, opts) => http(filesPort, path, opts);
+const herdrCalls = async () => (existsSync(herdrLog) ? (await readFile(herdrLog, "utf8")).trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
+
+before(async () => {
+  root = realpathSync(await mkdtemp(join(tmpdir(), "herdr-crew-http-")));
+  project = join(root, "project");
+  herdrLog = join(root, "herdr.log");
+  await mkdir(join(project, "docs"), { recursive: true });
+  await writeFile(join(project, "docs", "notes.md"), "# Notes\n\n<script>alert(1)</script>\n");
+  await writeFile(join(project, "page.html"), "<h1>page</h1>");
+  await writeFile(join(project, "secret.txt"), "not listed");
+  await writeFile(join(root, "outside.md"), "# outside the project");
+  await symlink(join(root, "outside.md"), join(project, "link-out.md"));
+  await writeFile(join(project, "probe-widget.mjs"), `
+    import { writeFile } from "node:fs/promises";
+    import { join } from "node:path";
+    export default ({ project }) => ({
+      id: "probe", title: "Probe", async view() { return { state: "on" }; },
+      actions: { poke: { confirm: () => "Pokes the probe", run: () => writeFile(join(project, "poked"), "1") } },
+    });
+  `);
+  await writeFile(join(project, ".herdr-crew.json"), JSON.stringify({
+    title: "http-test", workspace: "w99", backlog: false, themeAsked: true, theme: { name: "keep" },
+    personas: [{ agent: "m9-probe", name: "Probe", pronouns: "it", role: "test", tasks: [] }],
+    widgets: [
+      { module: "links", options: { links: [
+        { label: "notes", file: "docs/notes.md" },
+        { label: "page", file: "page.html" },
+        { label: "outside", file: "../outside.md" },
+        { label: "symlink", file: "link-out.md" },
+        { label: "script", url: "javascript:alert(1)" },
+      ] } },
+      { module: "./probe-widget.mjs" },
+    ],
+  }));
+
+  port = await freePort([]);
+  filesPort = await freePort([port]);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(ANTHROPIC|OPENAI|HERDR)_|^PORT$/.test(k)));
+  Object.assign(env, {
+    PATH: [join(APP, "test", "fixtures", "bin"), process.env.PATH].join(delimiter),
+    HERDR_CREW_TEST_LOG: herdrLog, HERDR_CREW_TEST_PROJECT: project,
+  });
+  server = spawn(process.execPath, [join(APP, "server.mjs"), "--project", project, "--port", String(port), "--files-port", String(filesPort), "--no-prompt"], { env, stdio: ["ignore", "pipe", "pipe"] });
+  server.stdout.on("data", (c) => output.push(String(c)));
+  server.stderr.on("data", (c) => output.push(String(c)));
+
+  const until = Date.now() + 15000;
+  for (;;) {
+    const log = output.join("");
+    if (log.includes(`http://localhost:${port}`) && log.includes(`http://localhost:${filesPort}/files/`)) {
+      const snap = JSON.parse((await api("/api/agents")).text);
+      if (snap.agents?.some((a) => a.id === "m9-probe" && a.live)) break;
+    }
+    if (server.exitCode !== null || Date.now() > until) throw new Error(`server did not start:\n${output.join("")}`);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+});
+
+after(async () => {
+  if (server && server.exitCode === null) {
+    const exited = new Promise((r) => server.once("exit", r));
+    server.kill();
+    await exited;
+  }
+  if (root) await rm(root, { recursive: true, force: true });
+});
+
+test("uses its own ports, outside the range of live dashboards", () => {
+  for (const p of [port, filesPort]) assert.ok(!RESERVED.has(p), String(p));
+});
+
+test("dashboard: a wrong Host gets 421", async () => {
+  for (const host of ["evil.example", `evil.example:${port}`, `localhost:${port + 1}`, "localhost"]) {
+    const r = await api("/api/config", { host });
+    assert.equal(r.status, 421, host);
+  }
+  // Node itself answers 400 to an HTTP/1.1 request without Host, before the guard runs.
+  assert.equal((await api("/api/config", { host: null })).status, 400);
+  assert.equal((await api("/api/config", { host: `127.0.0.1:${port}` })).status, 200);
+  assert.equal((await api("/api/config")).status, 200);
+});
+
+test("dashboard: a wrong Host gets 421 before any action", async () => {
+  const r = await api("/api/theme", { method: "POST", host: "evil.example", headers: ok(), body: { confirmed: true, reset: true } });
+  assert.equal(r.status, 421);
+  assert.deepEqual(JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8")).theme, { name: "keep" });
+});
+
+const POSTS = [
+  ["/api/theme", { confirmed: true, reset: true }],
+  ["/api/crew/onboard", { confirmed: true }],
+  ["/api/agents/m9-probe/prompt", { text: "hello", confirmed: true }],
+  ["/api/agents/m9-probe/register", { name: "X", confirmed: true }],
+  ["/api/agents/m9-probe/keys", { keys: ["enter"], confirmed: true }],
+  ["/api/widgets/probe/poke", { confirmed: true }],
+];
+
+test("dashboard: POST without a matching Origin or without X-Crew gets 403", async () => {
+  const cases = {
+    "no origin": { "x-crew": "1" },
+    "no x-crew": { origin: `http://localhost:${port}` },
+    "x-crew not 1": { origin: `http://localhost:${port}`, "x-crew": "true" },
+    "foreign origin": { origin: "http://evil.example", "x-crew": "1" },
+    "other port": { origin: `http://localhost:${port + 1}`, "x-crew": "1" },
+    "https origin": { origin: `https://localhost:${port}`, "x-crew": "1" },
+    "null origin": { origin: "null", "x-crew": "1" },
+  };
+  for (const [path, body] of POSTS) {
+    for (const [name, headers] of Object.entries(cases)) {
+      const r = await api(path, { method: "POST", headers: { "content-type": "application/json", ...headers }, body });
+      assert.equal(r.status, 403, `${path} ${name}`);
+    }
+  }
+  assert.ok(!existsSync(join(project, "poked")));
+});
+
+test("dashboard: actions without confirmed: true get 400", async () => {
+  const cases = [
+    ["/api/theme", { reset: true }],
+    ["/api/theme", { reset: true, confirmed: "true" }],
+    ["/api/crew/onboard", {}],
+    ["/api/agents/m9-probe/register", { name: "X" }],
+    ["/api/agents/m9-probe/onboard", {}],
+    ["/api/agents/m9-probe/keys", { keys: ["enter"], confirmed: 1 }],
+    ["/api/agents/m9-probe/type", { text: "y" }],
+    ["/api/widgets/probe/poke", {}],
+    ["/api/widgets/probe/poke", { confirmed: "yes" }],
+  ];
+  for (const [path, body] of cases) {
+    const r = await api(path, { method: "POST", headers: ok(), body });
+    assert.equal(r.status, 400, `${path} ${JSON.stringify(body)}`);
+    assert.match(r.text, /not confirmed/, path);
+  }
+  assert.ok(!existsSync(join(project, "poked")));
+  assert.deepEqual(JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8")).theme, { name: "keep" });
+});
+
+test("dashboard: a bad body gets 400", async () => {
+  const r = await api("/api/theme", { method: "POST", headers: ok(), body: "{not json" });
+  assert.equal(r.status, 400);
+});
+
+test("dashboard: no blocked prompts, keys or text reached herdr", async () => {
+  const sent = (await herdrCalls()).filter((a) => ["prompt", "send-keys", "send-text", "focus", "zoom"].includes(a[1]));
+  assert.deepEqual(sent, []);
+});
+
+test("dashboard: a confirmed widget action with the right headers runs", async () => {
+  const r = await api("/api/widgets/probe/poke", { method: "POST", headers: ok(), body: { confirmed: true } });
+  assert.equal(r.status, 202);
+  assert.ok(existsSync(join(project, "poked")));
+  await unlink(join(project, "poked"));
+});
+
+test("dashboard: serves no project files", async () => {
+  for (const path of ["/files/links/0-notes.md", "/secret.txt", "/.herdr-crew.json", "/docs/notes.md", "/avatars/../secret.txt"]) {
+    assert.equal((await api(path)).status, 404, path);
+  }
+});
+
+test("links widget: outside files, symlinks out and non-http links are reported and get no URL", async () => {
+  const views = JSON.parse((await api("/api/widgets")).text);
+  const links = views.find((v) => v.id === "links");
+  const by = Object.fromEntries(links.links.map((l) => [l.title, l]));
+  assert.equal(by.notes.url, `http://localhost:${filesPort}/files/links/0-notes.md`);
+  assert.equal(by.page.url, `http://localhost:${filesPort}/files/links/1-page.html`);
+  for (const t of ["outside", "symlink", "script"]) {
+    assert.equal(by[t].enabled, false, t);
+    assert.equal(by[t].url, "#", t);
+  }
+  assert.match(links.warning, /outside:/);
+  assert.match(links.warning, /symlink:/);
+  assert.match(links.warning, /script: only http and https links/);
+});
+
+test("files origin: serves configured files only", async () => {
+  const md = await files("/files/links/0-notes.md");
+  assert.equal(md.status, 200);
+  assert.match(md.headers["content-type"], /^text\/html/);
+  assert.match(md.headers["content-security-policy"], /default-src 'none'/);
+  assert.equal(md.headers["x-content-type-options"], "nosniff");
+  assert.match(md.text, /<h1 id="notes">Notes<\/h1>/);
+  assert.doesNotMatch(md.text, /<script>/);
+  const page = await files("/files/links/1-page.html");
+  assert.equal(page.status, 200);
+  assert.equal(page.text, "<h1>page</h1>");
+
+  for (const path of [
+    "/files/links/2-outside.md", "/files/links/3-link-out.md", "/files/links/9-secret.txt", "/files/links/secret.txt",
+    "/files/probe/0-notes.md", "/files/links/..%2Fsecret.txt", "/files/links%2F0-notes.md/x", "/files/links/../../secret.txt",
+    "/files/links/0-notes.md/", "/secret.txt", "/.herdr-crew.json", "/api/config", "/",
+  ]) {
+    assert.equal((await files(path)).status, 404, path);
+  }
+});
+
+test("files origin: wrong Host 421, writes 405, cross-site fetches 403", async () => {
+  assert.equal((await files("/files/links/0-notes.md", { host: `localhost:${port}` })).status, 421);
+  assert.equal((await files("/files/links/0-notes.md", { host: "evil.example" })).status, 421);
+  for (const method of ["POST", "PUT", "DELETE"]) assert.equal((await files("/files/links/0-notes.md", { method })).status, 405, method);
+  assert.equal((await files("/files/links/0-notes.md", { headers: { "sec-fetch-site": "cross-site" } })).status, 403);
+  assert.equal((await files("/files/links/0-notes.md", { headers: { "sec-fetch-site": "same-site" } })).status, 200);
+  const head = await files("/files/links/0-notes.md", { method: "HEAD" });
+  assert.equal(head.status, 200);
+  assert.equal(head.text, "");
+});
+
+test("files origin: a listed file replaced by a symlink out of the project is refused", async () => {
+  const target = join(project, "page.html");
+  await unlink(target);
+  await symlink(join(root, "outside.md"), target);
+  assert.equal((await files("/files/links/1-page.html")).status, 404);
+});

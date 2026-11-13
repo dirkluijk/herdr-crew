@@ -6,6 +6,6 @@
   "bin": { "herdr-crew": "server.mjs" },
   "files": ["server.mjs", "lib", "public", "widgets", "skills", "README.md"],
   "engines": { "node": ">=22" },
-  "scripts": { "start": "node server.mjs", "check": "node --check server.mjs && for f in lib/*.mjs widgets/*.mjs; do node --check $f; done" },
+  "scripts": { "start": "node server.mjs", "test": "node --test 'test/*.test.mjs'", "check": "node --check server.mjs && for f in lib/*.mjs widgets/*.mjs; do node --check $f; done" },
   "license": "MIT"
 }
