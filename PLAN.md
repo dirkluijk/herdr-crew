@@ -18,7 +18,8 @@ Its files origin is http://localhost:5191.
 It runs in Herdr pane `w2B:p11` in that workspace.
 Its config is `~/workspace/other-project/.herdr-crew.json`.
 The config has more than 15 personas, the Night theme, a links widget named `deck`, and a dev-server widget named `docs-pushed`.
-That instance belongs to other-project. Do not stop or reconfigure it from this repo.
+That instance belongs to other-project. Do not reconfigure it from this repo.
+The herdr-crew orchestrator may restart it after a merge into main, with the command in that pane plus `--no-prompt`, and reports each restart to the user (user decision 2026-11-13).
 The older dashboard is still in `other-project/dashboard/` on port `5180`.
 Pixel built that project-specific dashboard; it is not maintained here.
 The skill is installed as a symlink: `~/.config/opencode/skills/herdr-crew` points to `skills/herdr-crew` in this checkout, so skill changes are live without copying.
