@@ -67,7 +67,7 @@ before(async () => {
     });
   `);
   await writeFile(join(project, ".herdr-crew.json"), JSON.stringify({
-    title: "http-test", workspace: "w99", backlog: false, themeAsked: true, theme: { name: "keep" }, terminalApp: "FakeTerm",
+    title: "http-test", workspace: "w99", backlog: true, themeAsked: true, theme: { name: "keep" }, terminalApp: "FakeTerm",
     personas: [{ agent: "m9-probe", name: "Probe", pronouns: "it", role: "test", tasks: [] }],
     widgets: [
       { module: "links", options: { links: [
@@ -385,4 +385,32 @@ test("files origin: a listed file replaced by a symlink out of the project is re
   await unlink(target);
   await symlink(join(root, "outside.md"), target);
   assert.equal((await files("/files/links/1-page.html")).status, 404);
+});
+
+test("tasks: JSON output becomes a rendered view", async () => {
+  const r = await api("/api/tasks/NEW-1");
+  assert.equal(r.status, 200);
+  const { id, view, text } = JSON.parse(r.text);
+  assert.equal(id, "NEW-1");
+  assert.equal(text, undefined);
+  assert.equal(view.title, "New <b>task</b>");
+  assert.equal(view.status, "In Progress");
+  assert.deepEqual(view.dependencies, [{ id: "OLD-1", title: "Old task", status: "Done" }]);
+  assert.deepEqual(view.acceptanceCriteria.map((c) => c.checked), [true, false]);
+  assert.match(view.sections[0].html, /<strong>bold<\/strong>/);
+  assert.doesNotMatch(view.sections[0].html, /<script/);
+});
+
+test("tasks: without --json or with an unknown schema the plain text comes back", async () => {
+  for (const id of ["OLD-1", "ODD-1"]) {
+    const body = JSON.parse((await api(`/api/tasks/${id}`)).text);
+    assert.equal(body.view, undefined, id);
+    assert.equal(body.text, `Task ${id} - plain\nStatus: Done\n`, id);
+  }
+});
+
+test("tasks: unknown ids 404, bad ids and other methods 400", async () => {
+  assert.equal((await api("/api/tasks/NOPE-1")).status, 404);
+  for (const path of ["/api/tasks/not-a-task", "/api/tasks/..%2Fx", "/api/tasks/NEW-1/edit"]) assert.equal((await api(path)).status, 400, path);
+  assert.equal((await api("/api/tasks/NEW-1", { method: "POST", headers: ok(), body: { confirmed: true } })).status, 400);
 });

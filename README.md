@@ -38,7 +38,7 @@ herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
 | `bubbleLanguage` | Language for agent speech bubbles. |
 | `port` | HTTP port; defaults to `5190`. |
 | `workspace` | Optional Herdr workspace ID. Otherwise use `HERDR_WORKSPACE_ID` or the workspace where most agents have their cwd in the project. |
-| `backlog` | True when `backlog/` or `.backlog/` exists. Shows Backlog.md tasks per persona via `backlog task list --json` and task modals. |
+| `backlog` | True when `backlog/` or `.backlog/` exists. Shows Backlog.md tasks per persona via `backlog task list --json`. A task opens read only in a modal from `backlog task view <id> --json` (schema version 1): status, labels, dependencies that open in the same modal, acceptance criteria as checkboxes, and the markdown sections rendered on the server. Other Backlog.md versions get the `--plain` text. |
 | `avatarDir` | Directory for persona avatars. |
 | `terminalApp` | macOS app to bring to the front after Go to, for example Alacritty. `init` detects it from the terminal that started Herdr (`__CFBundleIdentifier`, variables such as `ALACRITTY_SOCKET` or `KITTY_WINDOW_ID`, then `TERM_PROGRAM`), or takes `HERDR_CREW_TERMINAL`. Without it, Go to only focuses the pane in Herdr. |
 | `summaries` | `{ "lead": true, "model": ... }` for an optional lead summary. |

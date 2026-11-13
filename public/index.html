@@ -189,6 +189,23 @@
   .warn { color: var(--done); margin: 0.4rem 0; }
   .err { color: var(--blocked); margin-top: 0.5rem; min-height: 1.2rem; }
   .hint { color: var(--muted); font-size: 0.85rem; }
+  .tview { max-height: 68vh; overflow: auto; padding-right: 0.3rem; }
+  .tview .meta { display: flex; justify-content: flex-start; gap: 0.35rem; flex-wrap: wrap; align-items: center; font-size: inherit; color: inherit; }
+  .tpill { background: var(--c); color: var(--bg); font-size: 0.78rem; font-weight: 700; padding: 0.12rem 0.65rem; border-radius: 99px; }
+  .tview h4 { margin: 1.1rem 0 0.35rem; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .tview .md { font-size: 0.9rem; line-height: 1.5; overflow-wrap: anywhere; }
+  .tview .md p, .tview .md ul, .tview .md ol { margin: 0.3rem 0; }
+  .tview .md h1, .tview .md h2, .tview .md h3 { font-size: 1rem; margin: 0.8rem 0 0.3rem; }
+  .tview .md code { font-size: 0.85em; background: #ffffff14; padding: 0.05rem 0.3rem; border-radius: 4px; }
+  .tview .md table { border-collapse: collapse; } .tview .md th, .tview .md td { border: 1px solid #ffffff26; padding: 0.2rem 0.45rem; text-align: left; }
+  .tview .md a { color: var(--accent2); }
+  .tview .md blockquote { margin: 0.4rem 0; padding-left: 0.8rem; border-left: 3px solid var(--accent); }
+  .tview .checks { list-style: none; padding: 0; margin: 0; }
+  .tview .checks li { display: flex; gap: 0.55rem; align-items: flex-start; }
+  .tview .checks input { margin-top: 0.4rem; accent-color: var(--done); }
+  .tview .checks li.on .md { color: var(--muted); }
+  .tview .deps { display: flex; flex-direction: column; gap: 0.3rem; }
+  .tview .deps div { display: flex; gap: 0.45rem; align-items: center; font-size: 0.88rem; }
   .tools { position: absolute; top: 0.55rem; right: 0.6rem; display: flex; gap: 0.2rem; opacity: 0; transition: opacity .15s; }
   .card:hover .tools, .card:focus-within .tools, .tools:has(.pin.on) { opacity: 1; }
   .tools button { width: 1.7rem; height: 1.7rem; padding: 0; border-radius: 8px; border: 1px solid #ffffff22; background: color-mix(in srgb, var(--panel) 80%, var(--ink)); color: var(--ink); font-size: 0.8rem; line-height: 1; }
@@ -240,6 +257,7 @@ const I18N = {
     newTag: "nieuw", unregistered: "niet geregistreerd", informed: (via) => `geïnformeerd${via === "orchestrator" ? " via de orchestrator" : ""}`,
     by: { self: ["✍️ eigen woorden", "Door de agent zelf ingevuld"], stale: ["✍️ vorige beurt", "Eigen woorden van de vorige beurt"], screen: ["🖥 scherm", "Laatste schermregels, geen eigen wolkje"], summary: ["🤖 samengevat", "Samengevat door een model"], mascot: ["🌰 oneliner", "Wisselende oneliner"] },
     noTerminal: "Pane staat vooraan in Herdr, maar de terminal komt niet naar voren: zet terminalApp in .herdr-crew.json (bijv. Alacritty).", openFailed: (n) => `terminalApp ${n} kon niet geopend worden; klopt de naam in .herdr-crew.json?`,
+    task: { description: "Beschrijving", implementationPlan: "Plan", implementationNotes: "Implementatienotities", finalSummary: "Samenvatting", ac: "Acceptatiecriteria", dod: "Definition of Done", deps: "Hangt af van", priority: "prioriteit" },
     goTo: "↗ Ga naar", zoom: "⤢ Zoom", screen: "▤ Scherm", answer: "⚠ Beantwoord dialoog", inform: "👋 Informeer", register: "📝 Registreer",
     chatPh: (n) => `Bericht aan ${n} (Enter verstuurt, Shift+Enter is nieuwe regel)`, chatBlocked: (n) => `${n} wacht op een dialoog, gebruik Beantwoord dialoog`, chatBusy: (n) => `${n} is aan het werk, even wachten…`,
     sending: "versturen…", you: "Jij", viaDash: "via dashboard", context: "context", soon: "compaction nabij, handover nu", prep: "handover voorbereiden",
@@ -268,6 +286,7 @@ const I18N = {
     newTag: "new", unregistered: "not registered", informed: (via) => `informed${via === "orchestrator" ? " via the orchestrator" : ""}`,
     by: { self: ["✍️ own words", "Set by the agent itself"], stale: ["✍️ previous turn", "Own words from the previous turn"], screen: ["🖥 screen", "Last screen lines, no own bubble"], summary: ["🤖 summary", "Summarised by a model"], mascot: ["🌰 one-liner", "Rotating one-liner"] },
     noTerminal: "Focused the pane in Herdr, but the terminal stays behind: set terminalApp in .herdr-crew.json (for example Alacritty).", openFailed: (n) => `Could not open terminalApp ${n}; is the name in .herdr-crew.json right?`,
+    task: { description: "Description", implementationPlan: "Plan", implementationNotes: "Implementation notes", finalSummary: "Final summary", ac: "Acceptance criteria", dod: "Definition of Done", deps: "Depends on", priority: "priority" },
     goTo: "↗ Go to", zoom: "⤢ Zoom", screen: "▤ Screen", answer: "⚠ Answer dialog", inform: "👋 Inform", register: "📝 Register",
     chatPh: (n) => `Message to ${n} (Enter sends, Shift+Enter for a new line)`, chatBlocked: (n) => `${n} waits on a dialog, use Answer dialog`, chatBusy: (n) => `${n} is working, hold on…`,
     sending: "sending…", you: "You", viaDash: "via dashboard", context: "context", soon: "compaction close, hand over now", prep: "prepare a handover",
@@ -643,9 +662,37 @@ function focusHint(r) {
   else if (r.ok && r.terminalApp === null && !noTerminalShown) { noTerminalShown = true; showToast(L.noTerminal); }
 }
 
+const taskColor = (status) => {
+  const s = status.toLowerCase();
+  return /done|complete/.test(s) ? "--done" : /progress|doing|review/.test(s) ? "--working" : /block/.test(s) ? "--blocked" : /to ?do|open|backlog/.test(s) ? "--idle" : "--unknown";
+};
+const taskPill = (status) => status ? `<span class="tpill" style="--c:var(${taskColor(status)})">${esc(status)}</span>` : "";
+
+// Plain fields are escaped here; the markdown fields (html) are rendered and escaped by the server.
+function taskHtml(v) {
+  const T = L.task;
+  const checks = (title, items) => items.length ? `<h4>${title}</h4><ul class="checks">${items.map((c) =>
+    `<li class="${c.checked ? "on" : ""}"><input type="checkbox" disabled ${c.checked ? "checked" : ""} aria-label="#${c.index}"><div class="md">${c.html}</div></li>`).join("")}</ul>` : "";
+  const meta = [taskPill(v.status), v.priority ? `<span class="pill">${T.priority}: ${esc(v.priority)}</span>` : "",
+    ...v.labels.map((l) => `<span class="pill">${esc(l)}</span>`), ...v.assignees.map((a) => `<span class="pill">${esc(a)}</span>`)].join("");
+  const deps = v.dependencies.length ? `<h4>${T.deps}</h4><div class="deps">${v.dependencies.map((d) =>
+    `<div><button class="task" data-task="${esc(d.id)}">${esc(d.id)}</button>${taskPill(d.status)}<span>${esc(d.title)}</span></div>`).join("")}</div>` : "";
+  const section = (key) => v.sections.filter((s) => s.key === key).map((s) => `<h4>${T[key]}</h4><div class="md">${s.html}</div>`).join("");
+  return `<div class="tview"><div class="meta">${meta}</div>${deps}${section("description")}${checks(T.ac, v.acceptanceCriteria)}${checks(T.dod, v.definitionOfDone)}
+    ${section("implementationPlan")}${section("implementationNotes")}${section("finalSummary")}</div>`;
+}
+
+let taskSeq = 0;
 async function openTask(id) {
+  const seq = ++taskSeq;
   showModal(`<h3>${esc(id)}</h3><pre>${L.loading}</pre><div class="row"><button data-close>${L.close}</button></div>`);
-  try { modal.querySelector("pre").textContent = (await api(`api/tasks/${encodeURIComponent(id)}`)).text; } catch (e) { modal.querySelector("pre").textContent = e.message; }
+  const pre = modal.querySelector("pre");
+  let data;
+  try { data = await api(`api/tasks/${encodeURIComponent(id)}`); } catch (e) { data = { text: e.message }; }
+  // A newer task, another dialog or a closed modal wins over a slow answer.
+  if (seq !== taskSeq || !modal.open || !pre.isConnected) return;
+  if (data.view) showModal(`<h3>${esc(data.view.id)} · ${esc(data.view.title)}</h3>${taskHtml(data.view)}<div class="row"><button data-close>${L.close}</button></div>`);
+  else pre.textContent = data.text;
 }
 
 // Shows the exact target and content; sends only on an explicit click.
