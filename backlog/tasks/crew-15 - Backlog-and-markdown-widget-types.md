@@ -2,8 +2,10 @@
 id: CREW-15
 title: Backlog and markdown widget types
 status: To Do
-assignee: []
+assignee:
+  - '@m5-panels'
 created_date: '2026-11-13 12:36'
+updated_date: '2026-11-13 12:38'
 labels:
   - widgets
 dependencies: []
