@@ -673,3 +673,18 @@ test("reopen: refused for a live agent, then starts the stored session in a new 
   await herdrState({});
   await writeConfig({ personas: cfg.personas });
 });
+
+test("agents: Zoom and Screen are gone, the Answer dialog still reads the screen", async () => {
+  for (const action of ["zoom", "screen", "nope"]) {
+    const r = await api(`/api/agents/m9-probe/${action}`, { method: "POST", headers: ok(), body: { confirmed: true } });
+    assert.equal(r.status, 404, action);
+  }
+  assert.deepEqual((await herdrCalls()).filter((a) => a[0] === "pane" && a[1] === "zoom"), []);
+  await writeFile(screenFile, "line one\nline two\n");
+  const r = await api("/api/agents/m9-probe/screen");
+  assert.equal(r.status, 200);
+  assert.match(JSON.parse(r.text).text, /line two/);
+  const page = (await api("/")).text;
+  assert.doesNotMatch(page, /data-act="zoom"|data-act="screen"|openScreens|⤢ Zoom|▤ Scherm|▤ Screen/);
+  assert.match(page, /api\/agents\/\$\{encodeURIComponent\(a\.id\)\}\/screen/);
+});

@@ -47,7 +47,7 @@ The page updates cards by key: only cards whose data changed are rebuilt, so hov
 Its snapshot includes status, the agent's own say-token bubble, screen fallback, last incoming message and sender, context use, new or unregistered agents, and mascots.
 `lib/screen.mjs`: ANSI stripping, secret redaction, and OpenCode screen parsing; it distinguishes tool blocks from user prompts by border colour in the ANSI visible read (`herdr agent read --source visible --format ansi`), ignores blocks cut off at the top of the viewport, and detects drafts in the OpenCode input box (`inputDraft`).
 `lib/actions.mjs`: Host and Origin checks, fixed Herdr command map through `execFile`, action endpoints, and `actions.log`; dashboard prompts and onboarding refuse to submit into a draft (409), and Go to (focus) is logged and returns `terminalApp` and `raised`.
-Agent actions include focus, zoom, screen, prompt, dialog keys or text, onboarding, and registration.
+Agent actions include focus, prompt, dialog keys or text (with the screen read for the Answer dialog), onboarding, registration, close, and reopen.
 It also handles the crew onboarding endpoint.
 `lib/onboarding.mjs`: persona validation, `registerPersona` (add or update only the supplied fields), and onboarding messages sent through the orchestrator or directly to an agent.
 `lib/summary.mjs`: optional two-paragraph lead-persona summary through an Anthropic-compatible Messages API, with thinking off.

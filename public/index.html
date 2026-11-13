@@ -105,7 +105,7 @@
   .by.self { background: color-mix(in srgb, var(--c) 30%, transparent); color: var(--ink); }
   .hero { padding: 1rem 2rem 0; }
   .card.lead {
-    grid-template-columns: 200px 1fr; grid-template-areas: "av info" "av conv" "av chat" "actions actions" "screen screen" "meta meta";
+    grid-template-columns: 200px 1fr; grid-template-areas: "av info" "av conv" "av chat" "actions actions" "meta meta";
     column-gap: 1.6rem; padding: 1.5rem 1.8rem; border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
     background: linear-gradient(135deg, color-mix(in srgb, var(--c) 14%, var(--panel)), var(--panel) 60%);
   }
@@ -116,14 +116,13 @@
   .card.lead .conv { grid-area: conv; }
   .card.lead .chat { grid-area: chat; margin-top: 0.6rem; }
   .card.lead .actions { grid-area: actions; margin-top: 0.8rem; }
-  .card.lead .screen { grid-area: screen; margin-top: 0.6rem; }
   .card.lead .meta { grid-area: meta; margin-top: 0.4rem; }
   .card.lead .bubble { max-height: none; white-space: pre-line; font-size: 1.12rem; line-height: 1.55; padding: 1rem 1.3rem; margin-top: 1rem; }
   .card.lead .bubble .headline { font-size: 1.2rem; }
   .card.lead .bubble::before { top: 24px; left: -14px; border: 12px solid transparent; border-left: 0; border-right-color: color-mix(in srgb, var(--c) 70%, transparent); }
   .card.lead .bubble::after { top: 26px; left: -10px; border: 10px solid transparent; border-left: 0; border-right-color: var(--bub); }
   @media (max-width: 760px) {
-    .card.lead { grid-template-columns: 1fr; grid-template-areas: "av" "info" "conv" "chat" "actions" "screen" "meta"; }
+    .card.lead { grid-template-columns: 1fr; grid-template-areas: "av" "info" "conv" "chat" "actions" "meta"; }
     .card.lead .bubble::before, .card.lead .bubble::after { display: none; }
   }
   .crown { font-size: 0.8rem; color: var(--done); margin-left: 0.3rem; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -131,10 +130,8 @@
   .actions { grid-column: 1 / -1; display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .actions button { padding: 0.25rem 0.7rem; border-radius: 99px; border: 1px solid #ffffff22; background: #ffffff0d; color: var(--ink); font-size: 0.8rem; }
   .actions button:hover { background: #ffffff1f; }
-  .actions button.on { background: color-mix(in srgb, var(--c) 35%, transparent); }
   .actions button.urgent { background: var(--blocked); color: var(--bg); font-weight: 700; }
   .actions button.welcome { background: var(--accent); color: var(--bg); font-weight: 700; border: 0; }
-  .screen { grid-column: 1 / -1; margin: 0; padding: 0.7rem; max-height: 26rem; overflow: auto; background: #0b0a12; color: #d8d4ee; border-radius: 12px; font: 0.72rem/1.35 ui-monospace, monospace; white-space: pre; }
   .conv { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 0.45rem; }
   .chat { grid-column: 1 / -1; }
   .chat textarea { width: 100%; resize: none; font: inherit; font-size: 0.86rem; padding: 0.55rem 0.8rem; border-radius: 14px; border: 1px solid #ffffff26; background: var(--bg); color: var(--ink); min-height: 2.4rem; max-height: 200px; }
@@ -271,7 +268,7 @@ const I18N = {
     by: { self: ["✍️ eigen woorden", "Door de agent zelf ingevuld"], stale: ["✍️ vorige beurt", "Eigen woorden van de vorige beurt"], screen: ["🖥 scherm", "Laatste schermregels, geen eigen wolkje"], summary: ["🤖 samengevat", "Samengevat door een model"], mascot: ["🌰 oneliner", "Wisselende oneliner"] },
     noTerminal: "Pane staat vooraan in Herdr, maar de terminal komt niet naar voren: zet terminalApp in .herdr-crew.json (bijv. Alacritty).", openFailed: (n) => `terminalApp ${n} kon niet geopend worden; klopt de naam in .herdr-crew.json?`,
     task: { description: "Beschrijving", implementationPlan: "Plan", implementationNotes: "Implementatienotities", finalSummary: "Samenvatting", ac: "Acceptatiecriteria", dod: "Definition of Done", deps: "Hangt af van", priority: "prioriteit" },
-    goTo: "↗ Ga naar", zoom: "⤢ Zoom", screen: "▤ Scherm", answer: "⚠ Beantwoord dialoog", inform: "👋 Informeer", register: "📝 Registreer",
+    goTo: "↗ Ga naar", answer: "⚠ Beantwoord dialoog", inform: "👋 Informeer", register: "📝 Registreer",
     chatPh: (n) => `Bericht aan ${n} (Enter verstuurt, Shift+Enter is nieuwe regel)`, chatBlocked: (n) => `${n} wacht op een dialoog, gebruik Beantwoord dialoog`, chatBusy: (n) => `${n} is aan het werk, even wachten…`,
     sending: "versturen…", you: "Jij", viaDash: "via dashboard", context: "context", soon: "compaction nabij, handover nu", prep: "handover voorbereiden",
     banner: (n, lead) => `${n} nieuwe agent${n === 1 ? "" : "s"} zonder persona of wolkje.${lead ? ` Onboarden is werk voor ${lead}.` : ""}`, bannerBtn: (lead) => lead ? `Vraag ${lead} om te onboarden` : "Informeer ze",
@@ -311,7 +308,7 @@ const I18N = {
     by: { self: ["✍️ own words", "Set by the agent itself"], stale: ["✍️ previous turn", "Own words from the previous turn"], screen: ["🖥 screen", "Last screen lines, no own bubble"], summary: ["🤖 summary", "Summarised by a model"], mascot: ["🌰 one-liner", "Rotating one-liner"] },
     noTerminal: "Focused the pane in Herdr, but the terminal stays behind: set terminalApp in .herdr-crew.json (for example Alacritty).", openFailed: (n) => `Could not open terminalApp ${n}; is the name in .herdr-crew.json right?`,
     task: { description: "Description", implementationPlan: "Plan", implementationNotes: "Implementation notes", finalSummary: "Final summary", ac: "Acceptance criteria", dod: "Definition of Done", deps: "Depends on", priority: "priority" },
-    goTo: "↗ Go to", zoom: "⤢ Zoom", screen: "▤ Screen", answer: "⚠ Answer dialog", inform: "👋 Inform", register: "📝 Register",
+    goTo: "↗ Go to", answer: "⚠ Answer dialog", inform: "👋 Inform", register: "📝 Register",
     chatPh: (n) => `Message to ${n} (Enter sends, Shift+Enter for a new line)`, chatBlocked: (n) => `${n} waits on a dialog, use Answer dialog`, chatBusy: (n) => `${n} is working, hold on…`,
     sending: "sending…", you: "You", viaDash: "via dashboard", context: "context", soon: "compaction close, hand over now", prep: "prepare a handover",
     banner: (n, lead) => `${n} new agent${n === 1 ? "" : "s"} without a persona or bubble.${lead ? ` Onboarding is ${lead}'s job.` : ""}`, bannerBtn: (lead) => lead ? `Ask ${lead} to onboard` : "Inform them",
@@ -346,8 +343,6 @@ let L = I18N.en;
 let config = { theme: null, widgets: [] };
 const COLORS = { working: "--working", idle: "--idle", done: "--done", blocked: "--blocked", closed: "--closed", mascot: "--mascot" };
 const prev = {};
-const openScreens = new Set();
-const screens = {};
 let current = { agents: [] };
 let last = 0;
 
@@ -449,7 +444,6 @@ function card(a) {
     <div class="conv">${conversation(a, bubble)}</div>
     ${a.live ? chatBox(a, st) : ""}
     ${a.live ? actionsRow(a, st) : a.canReopen ? `<div class="actions"><button data-act="reopen" data-id="${esc(a.id)}">${L.reopenBtn}</button></div>` : ""}
-    ${a.live && openScreens.has(a.id) ? `<pre class="screen" data-screen="${esc(a.id)}">${esc(screens[a.id] ?? L.loading)}</pre>` : ""}
     <div class="meta">${act}<span>${byTag(a)}<span data-ago="${esc(a.since ?? "")}">${ago(a.since)}</span></span></div>
   </div>`;
 }
@@ -535,8 +529,6 @@ function actionsRow(a, st) {
   const id = esc(a.id);
   return `<div class="actions">
     <button data-act="focus" data-id="${id}">${L.goTo}</button>
-    <button data-act="zoom" data-id="${id}">${L.zoom}</button>
-    <button data-act="screen" data-id="${id}" class="${openScreens.has(a.id) ? "on" : ""}">${L.screen}</button>
     ${!a.lead && !a.mascot && (a.isNew || !a.registered) ? `<button data-act="onboard" data-id="${id}" class="welcome">${L.inform}</button>` : ""}
     ${!a.registered ? `<button data-act="register" data-id="${id}">${L.register}</button>` : ""}
     ${st === "blocked" ? `<button data-act="answer" data-id="${id}" class="urgent">${L.answer}</button>` : ""}
@@ -571,7 +563,7 @@ const gridIds = (grid) => [...grid.querySelectorAll(":scope > [data-card]")].map
 // changed, and only moved when its place changed. Untouched cards keep hover, selection, scroll and focus.
 const cardEls = new Map();
 const tpl = document.createElement("template");
-const cardKey = (a) => `${JSON.stringify(a)}|${layout.pinned.includes(a.id)}|${openScreens.has(a.id)}|${chatNote[a.id] ?? ""}`;
+const cardKey = (a) => `${JSON.stringify(a)}|${layout.pinned.includes(a.id)}|${chatNote[a.id] ?? ""}`;
 function cardEl(a, built) {
   const key = cardKey(a);
   const old = cardEls.get(a.id);
@@ -640,7 +632,6 @@ function render(snap) {
   setHtml("banner", fresh.length && leadName
     ? `<div class="banner"><span>${esc(L.banner(fresh.length, leadName))}</span><button data-onboard-all>${esc(L.bannerBtn(leadName))}</button></div>` : "");
   for (const el of built) {
-    el.querySelectorAll("pre[data-screen]").forEach((pre) => (pre.scrollTop = pre.scrollHeight));
     el.querySelectorAll("textarea[data-chat]").forEach((ta) => { if (ta.value) ta.style.height = Math.min(ta.scrollHeight, 200) + "px"; });
   }
   if (focus) {
@@ -664,19 +655,6 @@ async function api(path, body) {
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
-
-async function refreshScreens() {
-  for (const id of openScreens) {
-    try { screens[id] = (await api(`api/agents/${encodeURIComponent(id)}/screen`)).text; } catch (e) { screens[id] = e.message; }
-    const el = document.querySelector(`pre[data-screen="${CSS.escape(id)}"]`);
-    if (el) {
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
-      el.textContent = screens[id];
-      if (atBottom) el.scrollTop = el.scrollHeight;
-    }
-  }
-}
-setInterval(refreshScreens, 4000);
 
 const modal = document.getElementById("modal");
 const agentById = (id) => current.agents.find((a) => a.id === id);
@@ -874,12 +852,6 @@ document.addEventListener("click", async (ev) => {
   const a = t.dataset.id && agentById(t.dataset.id);
   if (!a) return;
   const act = t.dataset.act;
-  if (act === "screen") {
-    openScreens.has(a.id) ? openScreens.delete(a.id) : openScreens.add(a.id);
-    render(current);
-    if (openScreens.has(a.id)) refreshScreens();
-    return;
-  }
   if (act === "answer") return openAnswer(a);
   if (act === "close") return confirmAction(L.closeTitle(a.name), L.closeText(a), L.closeBtn, async () => {
     await api(`api/agents/${encodeURIComponent(a.id)}/close`, { confirmed: true });
@@ -891,11 +863,10 @@ document.addEventListener("click", async (ev) => {
   });
   if (act === "onboard") return openOnboard(a);
   if (act === "register") return openRegister(a);
-  if (act === "focus" || act === "zoom") {
+  if (act === "focus") {
     t.disabled = true;
     try {
-      const r = await api(`api/agents/${encodeURIComponent(a.id)}/${act}`, {});
-      if (act === "focus") focusHint(r);
+      focusHint(await api(`api/agents/${encodeURIComponent(a.id)}/focus`, {}));
     } catch (e) { alert(e.message); }
     t.disabled = false;
   }
