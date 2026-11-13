@@ -12,7 +12,7 @@ Development used Node 24.
 ## Status (as of 2026-11-13)
 
 Version: `0.1.0`.
-Local repository: `~/workspace/herdr-crew`, branch `main`, with no remote.
+Local repository: `~/workspace/herdr-crew`, branch `main`, remote `origin` at https://github.com/dirkluijk/herdr-crew (private).
 The running instance serves `~/workspace/other-project` at http://localhost:5190.
 Its files origin is http://localhost:5191.
 It runs in Herdr pane `w2B:p11` in that workspace.

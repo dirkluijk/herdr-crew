@@ -1,10 +1,11 @@
 ---
 id: CREW-6
 title: Add a remote for the herdr-crew repo
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@crew-orch'
 created_date: '2026-11-13 10:14'
-updated_date: '2026-11-13 11:35'
+updated_date: '2026-11-13 12:22'
 labels:
   - repo
 dependencies: []
@@ -19,12 +20,20 @@ ordinal: 6000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Remote chosen by the user, added and pushed
-- [ ] #2 Backlog remote settings match the new setup
+- [x] #1 Remote chosen by the user, added and pushed
+- [x] #2 Backlog remote settings match the new setup
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 crew-orch 2026-11-13: user chose GitHub, private, on account dirkluijk.
+
+crew-orch 2026-11-13: secret scan over all 26 commits (git grep on every revision for sk-, gho_, ghp_, AKIA, api key assignments, private keys, the Foundry host and key prefix): no hits; only author dirkluijk. Created private repo dirkluijk/herdr-crew with gh repo create --private --source . --push; visibility PRIVATE confirmed. backlog config: remoteOperations true, checkActiveBranches true. PLAN.md status updated.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The repo lives at https://github.com/dirkluijk/herdr-crew (private), main pushed after a clean secret scan of the full history; Backlog.md remote settings are on.
+<!-- SECTION:FINAL_SUMMARY:END -->
