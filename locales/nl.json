@@ -1,7 +1,6 @@
 {
   "meta.name": "Nederlands",
   "meta.englishName": "Dutch",
-
   "ui.titleOf": "De crew van {project}",
   "ui.connecting": "verbinden…",
   "ui.warming": "opwarmen…",
@@ -139,13 +138,10 @@
   "ui.resetLayoutTitle": "Volgorde en pins terugzetten (alleen in deze browser)",
   "ui.resetConfirm": "Volgorde en pins van dit dashboard terugzetten?",
   "ui.footer": "Leest Herdr (agents en schermen), OpenCode-sessiegeschiedenis en Backlog.md. ✍️ vult de agent zelf in, 🖥 zijn de laatste schermregels, 🤖 is een samenvatting. Knoppen doen alleen iets na jouw klik; alles komt in .herdr-crew/actions.log.",
-
   "crew.you": "Jij",
   "crew.shell": "shell-commando loopt",
   "crew.unknownRole": "Nog niet geregistreerd",
-
   "server.askTheme": "Thema voor het dashboard? Vrije tekst, bijvoorbeeld 'retro arcade' of 'ruimtestation'. Enter = standaardthema: ",
-
   "onboarding.message": "Welkom in de crew van {project}. Je bent {agent}{persona}.\nZet aan het eind van elke beurt je eigen tekstwolkje: één korte zin in het {language} van hooguit 80 tekens over waar je mee bezig bent of wat je net afrondde, zonder geheimen:\nherdr pane report-metadata \"$HERDR_PANE_ID\" --source crew --token say=\"<tekst>\"\nBerichten van {lead} beginnen met {prefix}, berichten van andere agents met [agent-naam].",
   "onboarding.leadFallback": "the orchestrator",
   "onboarding.prefix": "Via het crew-dashboard:",
@@ -153,13 +149,11 @@
   "onboarding.namePh": "<naam>",
   "onboarding.pronounsPh": "<pronouns>",
   "onboarding.rolePh": "<rol>",
-
   "panels.head": "Via het crew-dashboard: de gebruiker vraagt een nieuw paneel. Het verzoek, als platte tekst:",
   "panels.make": "Maak er één paneel van met een ingebouwd type, volgens de sectie Panels van de herdr-crew skill. Geen eigen HTML of code. Types:",
   "panels.add": "Voeg het toe met het commando hieronder; het dashboard toont het binnen een paar seconden, zonder herstart. Bijvoorbeeld:",
   "panels.end": "Laat de gebruiker daarna weten welk paneel je hebt toegevoegd. Past geen type, leg dat dan uit in plaats van iets anders te bouwen.",
   "panels.exampleTitle": "Open werk",
-
   "widget.remove": "Verwijdert het paneel {title} ({id}) uit .herdr-crew.json. Processen die het paneel startte, blijven draaien.",
   "widget.links.title": "Links",
   "widget.links.missing": "bestaat niet",
@@ -188,10 +182,21 @@
   "widget.devServer.busy": "poort {port} is al in gebruik",
   "widget.devServer.timeout": "de server kwam niet op binnen de wachttijd",
   "widget.devServer.noDeps": "geen node_modules; de widget installeert niets",
-
   "summary.system": "Je schrijft het tekstwolkje van de orchestrator op een dashboard met AI-agents. Vat in twee korte alinea's, gescheiden door een lege regel (samen hooguit 100 woorden), samen. Eerste alinea: wat er net gebeurd, besloten of afgerond is. Tweede alinea: wie nu waarmee bezig is en wat de volgende stap is. Schrijf in de ik-vorm, concreet maar zonder nummers, paden of code. Geen aanhalingstekens, geen gedachtestreepjes, geen emoji. Geef alleen de tekst.",
   "summary.persona": "Persona",
   "summary.role": "rol",
   "summary.status": "Status",
-  "summary.last": "Laatste bericht van de persona:"
+  "summary.last": "Laatste bericht van de persona:",
+  "ui.addLanguage": "＋ Taal toevoegen",
+  "ui.addLanguageTitle": "Taal toevoegen",
+  "ui.languagePh": "Bijvoorbeeld: Duits",
+  "ui.languageAddHint": "{name} vertaalt de teksten van het dashboard naar deze taal en voegt hem toe aan dit project; de server vertaalt zelf niets. Je ziet het bericht nog voordat het verstuurd wordt.",
+  "ui.languageNoLead": "Er staat geen lead persona in .herdr-crew.json (lead: true), dus er is niemand die de taal kan toevoegen.",
+  "ui.languageSent": "Verstuurd naar {name}. De taal verschijnt in deze lijst zodra hij is toegevoegd.",
+  "ui.languageProject": "dit project",
+  "languages.head": "Via het crew-dashboard: de gebruiker vraagt een nieuwe taal voor het dashboard. De taal, als platte tekst:",
+  "languages.translate": "Vertaal {en} naar die taal en schrijf het resultaat naar {draft}: één JSON-object met precies dezelfde sleutels, volgens de sectie Languages van de herdr-crew skill.",
+  "languages.rules": "Vertaal getrouw. Laat elke placeholder zoals {name} ongewijzigd, laat commando's, bestandsnamen en config-sleutels zoals .herdr-crew.json staan, en houd bevestigings- en veiligheidsteksten letterlijk en volledig: ze leggen uit wat een actie doet. Zet meta.name op de naam van de taal in die taal en meta.englishName op de Engelse naam.",
+  "languages.commands": "Controleer het bestand en voeg het daarna toe met een korte taalcode in kleine letters, zoals de:",
+  "languages.end": "Laat de gebruiker daarna weten dat de taal te kiezen is met de 🌐-knop. Meldt de controle problemen, verbeter dan het bestand en draai de controle opnieuw."
 }

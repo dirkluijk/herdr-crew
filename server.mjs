@@ -14,6 +14,7 @@ import { promptWhenReady } from "./lib/send.mjs";
 import { createOnboarding, registerPersona } from "./lib/onboarding.mjs";
 import { generateTheme, generateAvatars, imageEndpoint, flavourTheme } from "./lib/theme.mjs";
 import { i18n, tr } from "./lib/i18n.mjs";
+import { projectLocaleDir, checkLocaleFile, addLocale, languageRequestText, EN_FILE } from "./lib/languages.mjs";
 import { modelEndpoint } from "./lib/summary.mjs";
 import { buildConfig } from "./lib/init.mjs";
 import { renderMarkdown, markdownPage } from "./lib/markdown.mjs";
@@ -48,6 +49,11 @@ Usage:
   herdr-crew widget remove <id> [--project DIR]
   herdr-crew widget list [--project DIR]
       Adds, removes or lists panels in .herdr-crew.json. Only built-in types: ${Object.keys(PANEL_TYPES).join(", ")}.
+  herdr-crew locale list [--project DIR]
+  herdr-crew locale check <file>
+  herdr-crew locale add <code> --file <file> [--project DIR]
+      Lists, checks or adds a dashboard language. A file must have the keys and placeholders of locales/en.json;
+      add stores it in <project>/.herdr-crew/locales/<code>.json.
   herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
       Waits until the agent is idle or done and its input box is empty, then sends the prompt.
       Exit 0 sent, 2 timeout (default 100000 ms), 1 other errors.
@@ -57,7 +63,7 @@ Model features (lead summary, prompted theme) use ANTHROPIC_FOUNDRY_* or ANTHROP
 theme avatars use OPENAI_FOUNDRY_* or OPENAI_API_KEY. Without them everything degrades to defaults.`;
 
 const args = parseArgs(process.argv.slice(2));
-const command = ["init", "register", "send", "widget", "serve", "help"].includes(args._[0]) ? args._.shift() : "serve";
+const command = ["init", "register", "send", "widget", "locale", "serve", "help"].includes(args._[0]) ? args._.shift() : "serve";
 const project = resolve(args.project ?? process.cwd());
 
 if (command === "help" || args.help) {
@@ -135,6 +141,39 @@ if (command === "widget") {
   process.exit(1);
 }
 
+if (command === "locale") {
+  const [sub, arg] = args._;
+  i18n.addDir(projectLocaleDir(project));
+  if (sub === "list") {
+    for (const l of i18n.languages()) console.log(`${l.code}\t${l.name}\t${l.englishName}\t${l.project ? projectLocaleDir(project) : "built-in"}`);
+    process.exit(0);
+  }
+  if (sub === "check" && arg) {
+    const { errors } = await checkLocaleFile(resolve(arg));
+    if (errors.length) {
+      console.error(`${arg} has ${errors.length} problem${errors.length === 1 ? "" : "s"}:\n- ${errors.slice(0, 50).join("\n- ")}${errors.length > 50 ? `\n- and ${errors.length - 50} more` : ""}`);
+      process.exit(1);
+    }
+    console.log(`${arg} is a valid locale: same keys and placeholders as ${EN_FILE}.`);
+    process.exit(0);
+  }
+  if (sub === "add" && arg && typeof args.file === "string") {
+    if (!existsSync(join(project, CONFIG_FILE))) {
+      console.error(`No ${CONFIG_FILE} in ${project}; run herdr-crew init first.`);
+      process.exit(1);
+    }
+    const r = await addLocale({ project, code: arg, file: resolve(args.file) });
+    if (r.errors) {
+      console.error(`Language not added:\n- ${r.errors.slice(0, 50).join("\n- ")}${r.errors.length > 50 ? `\n- and ${r.errors.length - 50} more` : ""}`);
+      process.exit(1);
+    }
+    console.log(`${r.updated ? "Updated" : "Added"} ${arg} in ${r.path}. A running dashboard offers it in the language list right away.`);
+    process.exit(0);
+  }
+  console.error("Usage: herdr-crew locale list | locale check <file> | locale add <code> --file <file>  [--project DIR]");
+  process.exit(1);
+}
+
 if (command === "send") {
   const [agent, ...words] = args._;
   const text = words.join(" ").trim();
@@ -158,6 +197,7 @@ const cfg = await loadConfig(project);
 if (!cfg.exists) console.log(`No ${CONFIG_FILE} in ${project}; running with defaults. Try: herdr-crew init`);
 const PORT = Number(args.port ?? process.env.PORT ?? cfg.port);
 const stateDir = await makeStateDir(project);
+i18n.addDir(projectLocaleDir(project));
 const say = (s) => console.log(`[herdr-crew] ${s}`);
 
 // Theme: --reset-theme, --theme "text", --theme (ask), or ask once on the first interactive start.
@@ -230,7 +270,8 @@ const guard = createGuard(PORT);
 const cli = process.env.HERDR_CREW_CLI ?? CLI;
 const onboarding = createOnboarding({ project, cfg, crew, cli });
 const panels = { text: (prompt) => panelRequestText({ language: cfg.language, project, cli, prompt }) };
-const actions = createActions({ project, stateDir, cfg, guard, getSnapshot: crew.getSnapshot, onPrompt: crew.notePrompt, onboarding, panels });
+const languages = { text: (name) => languageRequestText({ language: cfg.language, project, cli, name }) };
+const actions = createActions({ project, stateDir, cfg, guard, getSnapshot: crew.getSnapshot, onPrompt: crew.notePrompt, onboarding, panels, languages });
 
 // Widgets: "dev-server" loads widgets/dev-server.mjs from this app, a path loads a module relative to the project.
 const FILES_PORT = Number(args["files-port"] ?? cfg.filesPort ?? PORT + 1);

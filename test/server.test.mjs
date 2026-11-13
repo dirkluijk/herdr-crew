@@ -726,3 +726,44 @@ test("theme: a saved theme only reaches the page with flavour texts", async () =
   assert.equal(c.theme.texts, undefined);
   await writeConfig({ theme: { name: "keep" } });
 });
+
+test("languages: locale add makes a new language selectable without restart, the request goes to the lead", async () => {
+  const en = JSON.parse(await readFile(join(APP, "locales", "en.json"), "utf8"));
+  const file = join(root, "de.json");
+  await writeFile(file, JSON.stringify({ ...en, "meta.name": "Deutsch", "meta.englishName": "German", "ui.cancel": "Abbrechen" }));
+  let r = await crewCli("locale", "check", file);
+  assert.equal(r.code, 0, r.out);
+  await writeFile(join(root, "bad.json"), JSON.stringify({ ...en, "ui.min": "x" }));
+  r = await crewCli("locale", "check", join(root, "bad.json"));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /ui\.min must have the placeholders \{n\}, has none/);
+  assert.equal((await crewCli("locale", "add", "de", "--file", join(root, "bad.json"), "--project", project)).code, 1);
+  assert.equal((await crewCli("locale", "add", "en", "--file", file, "--project", project)).code, 1);
+  r = await crewCli("locale", "add", "de", "--file", file, "--project", project);
+  assert.equal(r.code, 0, r.out);
+  assert.match((await crewCli("locale", "list", "--project", project)).out, /^de\tDeutsch\tGerman\t/m);
+
+  const langs = JSON.parse((await api("/api/config")).text).languages;
+  assert.deepEqual(langs.find((l) => l.code === "de"), { code: "de", name: "Deutsch", englishName: "German", project: true });
+  assert.equal((await api("/api/language", { method: "POST", headers: ok(), body: { confirmed: true, language: "de" } })).status, 200);
+  assert.equal(JSON.parse((await api("/api/config")).text).locale["ui.cancel"], "Abbrechen");
+
+  const post = (body) => api("/api/languages/request", { method: "POST", headers: ok(), body });
+  assert.equal((await api("/api/languages/request", { method: "POST", headers: { "content-type": "application/json" }, body: { confirmed: true, name: "Frans" } })).status, 403);
+  assert.equal((await post({ name: "Frans" })).status, 400);
+  assert.equal((await post({ confirmed: true, name: "x".repeat(61) })).status, 400);
+  assert.match((await post({ confirmed: true, name: "Frans" })).text, /no lead persona/);
+  const cfg = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  await writeConfig({ personas: cfg.personas.map((p) => ({ ...p, lead: true })) });
+  assert.ok(await until(async () => JSON.parse((await api("/api/languages/request")).text).live));
+  const preview = JSON.parse((await api(`/api/languages/request?name=${encodeURIComponent("Frans")}`)).text).text;
+  assert.match(preview, /\n> Frans\n/);
+  assert.match(preview, /locale add <code> --file .*locale-draft\.json --project /);
+  await copyFile(join(SCREENS, "session-empty.ansi"), screenFile);
+  r = await post({ confirmed: true, name: "Frans" });
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual((await prompts()).at(-1), ["agent", "prompt", "w99:p1", preview]);
+  assert.deepEqual((await actionLog()).at(-1).slice(2, 3), ["language request"]);
+  const { language, bubbleLanguage, ...rest } = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  await writeFile(join(project, ".herdr-crew.json"), JSON.stringify({ ...rest, personas: cfg.personas }));
+});

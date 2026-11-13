@@ -782,12 +782,14 @@ const languageLabel = (code) => {
   if (l) return l.name;
   try { return new Intl.DisplayNames([config.language, "en"], { type: "language" }).of(code) ?? code; } catch { return code; }
 };
-function openLanguage() {
+async function openLanguage() {
+  try { config.languages = (await api("api/config")).languages; } catch {}
   const langs = config.languages ?? [];
   showModal(`<h3>${h("ui.languageTitle")}</h3><p class="hint">${h("ui.languageHint")}</p>
-    <div class="langs">${langs.map((l) => `<label><input type="radio" name="lang" value="${esc(l.code)}" ${l.code === config.language ? "checked" : ""}> ${esc(l.name)} <span class="hint">${esc(l.code)}</span></label>`).join("")}</div>
+    <div class="langs">${langs.map((l) => `<label><input type="radio" name="lang" value="${esc(l.code)}" ${l.code === config.language ? "checked" : ""}> ${esc(l.name)} <span class="hint">${esc(l.code)}${l.project ? ` · ${h("ui.languageProject")}` : ""}</span></label>`).join("")}</div>
     <p class="hint">${h("ui.logNote")}</p><div class="err"></div>
-    <div class="row"><button data-close>${h("ui.cancel")}</button><button class="primary" data-confirm>${h("ui.languageSet")}</button></div>`);
+    <div class="row"><button data-close>${h("ui.cancel")}</button><button data-add-language>${h("ui.addLanguage")}</button><button class="primary" data-confirm>${h("ui.languageSet")}</button></div>`);
+  modal.querySelector("[data-add-language]").onclick = openAddLanguage;
   modal.querySelector("[data-confirm]").onclick = async (ev) => {
     const code = modal.querySelector("input[name=lang]:checked")?.value;
     if (!code || code === config.language) return modal.close();
@@ -797,6 +799,34 @@ function openLanguage() {
       applyConfig(await api("api/config"));
       modal.close();
     } catch (e) { modal.querySelector(".err").textContent = e.message; ev.target.disabled = false; }
+  };
+}
+async function openAddLanguage() {
+  let info;
+  try { info = await api("api/languages/request"); } catch (e) { return alert(e.message); }
+  const name = info.leadName ?? "";
+  const problem = !info.lead ? tx("ui.languageNoLead") : !info.live ? tx("ui.panelNotLive", { name }) : null;
+  showModal(`<h3>${h("ui.addLanguageTitle")}</h3>
+    ${problem ? `<p class="warn">${esc(problem)}</p>` : `<p class="hint">${h("ui.languageAddHint", { name })}</p>
+    <input type="text" name="language" maxlength="${Number(info.max) || 60}" placeholder="${h("ui.languagePh")}">
+    ${info.status === "working" ? `<p class="warn">${h("ui.panelBusy", { name })}</p>` : ""}`}
+    <div class="err"></div>
+    <div class="row"><button data-close>${h("ui.cancel")}</button>${problem ? "" : `<button class="primary" data-next>${h("ui.next")}</button>`}</div>`);
+  const next = modal.querySelector("[data-next]");
+  if (!next) return;
+  modal.querySelector("input[name=language]").focus();
+  next.onclick = async () => {
+    const language = modal.querySelector("input[name=language]").value.trim();
+    if (!language) return;
+    try {
+      const r = await api(`api/languages/request?name=${encodeURIComponent(language)}`);
+      const target = agentById(r.lead);
+      if (!r.live || !target) throw new Error(tx("ui.panelNotLive", { name: r.leadName ?? name }));
+      confirmStep(target, tx("ui.addLanguageTitle"), r.text, async () => {
+        await api("api/languages/request", { confirmed: true, name: language });
+        showToast(tx("ui.languageSent", { name: target.name }));
+      });
+    } catch (e) { modal.querySelector(".err").textContent = e.message; }
   };
 }
 document.getElementById("langbtn").onclick = openLanguage;

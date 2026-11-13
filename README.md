@@ -81,6 +81,18 @@ The 🌐 button in the header lists the available languages. Choosing one writes
 
 The test suite checks that every locale has exactly the keys and placeholders of `en.json` and no empty texts. Error messages of the HTTP API and the CLI stay in English.
 
+In the 🌐 dialog, Add language accepts a language name of at most 60 characters. It shows the exact message before confirmation, then sends it to the lead persona through the same check as chat. The lead must be idle or done with an empty input box; otherwise the request returns HTTP 409 with the reason. Without a live lead, the dialog explains why and sends nothing. The orchestrator creates the language; the server makes no model call for it. `POST /api/languages/request` uses the usual Host, Origin, `X-Crew` and `confirmed` checks, and logs the request in `.herdr-crew/actions.log`.
+
+Project languages live at `<project>/.herdr-crew/locales/<code>.json`, inside the state directory, which is usually in `.gitignore`. They cannot replace `en` or `nl` and do not change the herdr-crew checkout. To share a language with every project, add it to `locales/` in the checkout through a pull request. A running dashboard picks up a new or updated project language on the next request, without a restart.
+
+```sh
+herdr-crew locale list [--project DIR]
+herdr-crew locale check <file>
+herdr-crew locale add <code> --file <file> [--project DIR]
+```
+
+`check` and `add` compare the file with `locales/en.json`: it must have the same keys and placeholders, with no empty texts, control characters or texts far longer than the English ones. They exit 1 with the problems.
+
 A theme only changes flavour texts: the title, the tagline, the status labels and the section headings. Confirmations, errors, guard texts and onboarding messages always come from the locale file; the server drops any other text from a saved theme before the page sees it. If a theme prompt asks for a UI language, for example "space station, UI in English", and that locale exists, the dashboard switches to it. If it does not exist, the dialog says that it can be added as a new language.
 
 ## Prompted theme

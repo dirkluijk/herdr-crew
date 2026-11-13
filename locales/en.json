@@ -1,7 +1,6 @@
 {
   "meta.name": "English",
   "meta.englishName": "English",
-
   "ui.titleOf": "The {project} crew",
   "ui.connecting": "connecting…",
   "ui.warming": "warming up…",
@@ -139,13 +138,10 @@
   "ui.resetLayoutTitle": "Reset order and pins (this browser only)",
   "ui.resetConfirm": "Reset the order and pins of this dashboard?",
   "ui.footer": "Reads Herdr (agents and screens), OpenCode session history and Backlog.md. ✍️ is set by the agent, 🖥 are the last screen lines, 🤖 is a summary. Buttons only act on your click; everything goes into .herdr-crew/actions.log.",
-
   "crew.you": "You",
   "crew.shell": "shell command running",
   "crew.unknownRole": "Not registered yet",
-
   "server.askTheme": "Dashboard theme? Free text, for example 'retro arcade' or 'space station'. Enter = default theme: ",
-
   "onboarding.message": "Welcome to the {project} crew. You are {agent}{persona}.\nAt the end of every turn, set your own speech bubble: one short sentence in {language}, at most 80 characters, about what you are doing or just finished, no secrets:\nherdr pane report-metadata \"$HERDR_PANE_ID\" --source crew --token say=\"<text>\"\nMessages from {lead} start with {prefix}, messages from other agents with [agent-name].",
   "onboarding.leadFallback": "the orchestrator",
   "onboarding.prefix": "From the crew dashboard:",
@@ -153,13 +149,11 @@
   "onboarding.namePh": "<name>",
   "onboarding.pronounsPh": "<pronouns>",
   "onboarding.rolePh": "<role>",
-
   "panels.head": "From the crew dashboard: the user asks for a new panel. The request, as plain text:",
   "panels.make": "Turn it into one panel of a built-in type, following the Panels section of the herdr-crew skill. No HTML or code of your own. Types:",
   "panels.add": "Add it with the command below; the dashboard shows it within a few seconds, without a restart. For example:",
   "panels.end": "Then tell the user which panel you added. If no type fits, explain that instead of building something else.",
   "panels.exampleTitle": "Open work",
-
   "widget.remove": "Removes the panel {title} ({id}) from .herdr-crew.json. Processes the panel started keep running.",
   "widget.links.title": "Links",
   "widget.links.missing": "does not exist",
@@ -188,10 +182,21 @@
   "widget.devServer.busy": "port {port} is already in use",
   "widget.devServer.timeout": "the server did not come up in time",
   "widget.devServer.noDeps": "no node_modules; the widget installs nothing",
-
   "summary.system": "You write the speech bubble of the orchestrator on a dashboard of AI agents. Summarise in two short paragraphs separated by a blank line (at most 100 words together). First: what just happened, was decided or finished. Second: who works on what now and what comes next. First person, concrete, without numbers, paths or code. No quotes, no dashes, no emoji. Return only the text.",
   "summary.persona": "Persona",
   "summary.role": "role",
   "summary.status": "Status",
-  "summary.last": "Latest message of the persona:"
+  "summary.last": "Latest message of the persona:",
+  "ui.addLanguage": "＋ Add language",
+  "ui.addLanguageTitle": "Add a language",
+  "ui.languagePh": "For example: German",
+  "ui.languageAddHint": "{name} translates the dashboard texts into this language and adds it to this project; the server translates nothing itself. You see the message before it is sent.",
+  "ui.languageNoLead": "There is no lead persona in .herdr-crew.json (lead: true), so nobody can add the language.",
+  "ui.languageSent": "Sent to {name}. The language shows up in this list once it is added.",
+  "ui.languageProject": "this project",
+  "languages.head": "From the crew dashboard: the user asks for a new dashboard language. The language, as plain text:",
+  "languages.translate": "Translate {en} into that language and write the result to {draft}: one JSON object with exactly the same keys, following the Languages section of the herdr-crew skill.",
+  "languages.rules": "Translate faithfully. Keep every placeholder such as {name} unchanged, keep commands, file names and config keys such as .herdr-crew.json as they are, and keep confirmation and safety texts literal and complete: they explain what an action does. Set meta.name to the name of the language in that language and meta.englishName to its English name.",
+  "languages.commands": "Check the file, then add it with a short lowercase language code such as de:",
+  "languages.end": "Then tell the user that the language can be chosen with the 🌐 button. If the check reports problems, fix the file and run the check again."
 }
