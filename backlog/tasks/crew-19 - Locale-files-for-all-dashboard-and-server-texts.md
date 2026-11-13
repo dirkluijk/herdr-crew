@@ -2,9 +2,10 @@
 id: CREW-19
 title: Locale files for all dashboard and server texts
 status: To Do
-assignee: []
+assignee:
+  - '@m5-panels'
 created_date: '2026-11-13 13:22'
-updated_date: '2026-11-13 13:25'
+updated_date: '2026-11-13 13:58'
 labels:
   - i18n
   - ui

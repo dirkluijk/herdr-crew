@@ -2,8 +2,10 @@
 id: CREW-20
 title: Add a dashboard language through the orchestrator
 status: To Do
-assignee: []
+assignee:
+  - '@m5-panels'
 created_date: '2026-11-13 13:22'
+updated_date: '2026-11-13 13:58'
 labels:
   - i18n
   - skill
