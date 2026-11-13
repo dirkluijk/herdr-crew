@@ -1,6 +1,6 @@
 ---
 name: herdr-crew
-description: Crew conventions for projects with several coding agents in Herdr and a herdr-crew dashboard. Use when you run as an agent in Herdr in a project with a .herdr-crew.json, when you start or brief other agents as orchestrator, or when you register a persona.
+description: Crew conventions for projects with several coding agents in Herdr and a herdr-crew dashboard. Use when you run as an agent in Herdr in a project with a .herdr-crew.json, when you start or brief other agents as orchestrator, when you set up or run the herdr-crew dashboard for a project, or when you register a persona.
 ---
 
 # herdr-crew
@@ -31,7 +31,44 @@ node /path/to/herdr-crew/server.mjs register <agent> --name NAME --pronouns P --
 
 ## Orchestrator
 
-Register each agent before or just after starting it. Include one line in every briefing pointing to this skill. If the agent does not have it, give the bubble command and language instead. For example:
+### Set up the dashboard
+
+Only do this when the user asks for a crew dashboard or agrees to your proposal. Ask before you write files in the project.
+
+1. Create the config once, from the plan and the live tab labels:
+
+   ```sh
+   node /path/to/herdr-crew/server.mjs init --project "$PWD" --plan PLAN.md [--avatars DIR] [--import personas.json]
+   ```
+
+   Check the personas in `.herdr-crew.json` (name, pronouns, role, `lead: true` and `messagePrefixes` on your own entry) and fix what `init` guessed wrong. Suggest adding `.herdr-crew/` to `.gitignore`.
+2. Start the server in its own pane, without taking focus, and keep your own pane free:
+
+   ```sh
+   herdr pane split --current --direction down --cwd "$PWD" --no-focus
+   herdr pane run <new-pane-id> "node /path/to/herdr-crew/server.mjs --project $PWD"
+   ```
+
+   Read the pane ID from `.result.pane.pane_id`. On the first start the server asks the user for a theme in that pane; let the user answer, do not type it for them.
+3. Check `herdr pane read <new-pane-id> --source recent-unwrapped --lines 10` for the line with the URL (default http://localhost:5190) and give the user that URL.
+4. Note the pane ID and URL in the plan or the project task, so a later session can find the running dashboard.
+
+The server reloads `.herdr-crew.json` on its own. Restart it only for a new port or new widgets, and only after asking.
+
+### Starting agents
+
+When the project has a `.herdr-crew.json`, add these steps to the usual start of a milestone agent:
+
+1. Pick a persona and register it before you start the agent, so its card is ready from the first poll:
+
+   ```sh
+   node /path/to/herdr-crew/server.mjs register <agent> --project "$PWD" --name NAME --pronouns P --role ROLE
+   ```
+
+2. Label the tab `<agent> (<Name>, <pronouns>)` and name the Herdr agent `<agent>`.
+3. Put the crew line in the briefing (see below).
+
+Include one line in every briefing pointing to this skill. If the agent does not have it, give the bubble command and language instead. For example:
 
 > Load the herdr-crew skill: set your own Dutch bubble of at most 80 characters at the end of every turn.
 

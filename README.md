@@ -89,7 +89,7 @@ The server listens only on `127.0.0.1`. The Host header must be `localhost` or `
 
 ## Agent skill
 
-The draft skill is at [`skills/herdr-crew/SKILL.md`](skills/herdr-crew/SKILL.md). It is not installed anywhere. Copy it into your agent's skills directory yourself, for example `~/.config/opencode/skills/herdr-crew/`.
+The draft skill is at [`skills/herdr-crew/SKILL.md`](skills/herdr-crew/SKILL.md). It covers the crew conventions for every agent, and for the orchestrator how to set up and run the dashboard and how to register and brief new agents. It works next to an orchestration skill such as herdr-orchestrator, which only needs one line pointing to it. It is not installed anywhere. Copy it into your agent's skills directory yourself, for example `~/.config/opencode/skills/herdr-crew/`.
 
 ## Environment
 
