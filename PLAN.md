@@ -32,7 +32,7 @@ The test suite has 110 `node:test` tests (`npm test`) and no dependencies.
 
 ## Architecture (file map)
 
-`server.mjs`: CLI and HTTP server. Commands are `serve` (default), `init`, `register`, `send`, and `help`.
+`server.mjs`: CLI and HTTP server. Commands are `serve` (default), `init`, `register`, `send`, `widget` (add, remove, list), and `help`.
 `send <agent> <text> [--timeout MS] [--interval MS]` waits until the agent is idle or done and its OpenCode input box is empty before sending the prompt; exit code 2 means it timed out.
 Its flags include `--project`, `--port`, `--theme`, `--reset-theme`, `--theme-avatars`, `--no-prompt`, `--files-port`, and `--theme-model`.
 It serves the page, `/events` with server-sent snapshot events, `/api/agents`, `/api/config`, `/api/theme`, `/api/widgets`, and actions.
@@ -59,7 +59,9 @@ It uses `ANTHROPIC_FOUNDRY_*` or `ANTHROPIC_API_KEY`.
 The task modal renders `backlog task view <id> --json` (schemaVersion 1) with a status pill, read only acceptance criteria checkboxes, sections, and clickable dependencies; it falls back to plain text for an unknown schemaVersion.
 `lib/widgets.mjs`: the widget set that hot reloads `widgets` entries (keep, create, dispose) and removes an entry for the remove button.
 `lib/project-file.mjs`: the real path rule for project files, shared by the links and markdown widgets.
-`widgets/dev-server.mjs`, `widgets/links.mjs`, `widgets/backlog.mjs` and `widgets/markdown.mjs`: built-in widgets; backlog and markdown export `validate(options)`.
+`lib/panels.mjs`: the built-in panel types, entry validation for `widget add` and `widget remove`, and the message template that the Add panel button sends to the lead.
+`lib/widget-options.mjs`: shared option checks for the built-in widgets.
+`widgets/dev-server.mjs`, `widgets/links.mjs`, `widgets/backlog.mjs` and `widgets/markdown.mjs`: built-in widgets; each exports `validate(options)`.
 `skills/herdr-crew/SKILL.md`: agent skill, with `skills/herdr-crew/crew.mjs` as launcher.
 `README.md`: user documentation.
 `backlog/`: this project's Backlog.md data, using the `CREW` prefix.

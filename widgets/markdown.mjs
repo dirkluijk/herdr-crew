@@ -4,8 +4,8 @@
 import { statSync, readFileSync } from "node:fs";
 import { projectFile } from "../lib/project-file.mjs";
 import { renderMarkdown } from "../lib/markdown.mjs";
+import { isObject, checkId, checkText, checkPath, checkKeys, collect } from "../lib/widget-options.mjs";
 
-const ID = /^[a-z0-9_-]{1,40}$/;
 const MAX_BYTES = 512 * 1024;
 
 const T = {
@@ -14,12 +14,8 @@ const T = {
 };
 
 export function validate(options) {
-  if (!options || typeof options !== "object" || Array.isArray(options)) return ["options must be an object"];
-  const errors = [];
-  if (typeof options.file !== "string" || !options.file.trim()) errors.push("file is required: a path relative to the project");
-  else if (/^\/|^~/.test(options.file) || options.file.split(/[\\/]/).includes("..")) errors.push("file must be a path inside the project, without .. or a leading /");
-  if (options.id !== undefined && !(typeof options.id === "string" && ID.test(options.id))) errors.push("id must match [a-z0-9_-], at most 40 characters");
-  if (options.title !== undefined && !(typeof options.title === "string" && options.title.trim() && options.title.length <= 80)) errors.push("title must be text of at most 80 characters");
+  if (!isObject(options)) return ["options must be an object"];
+  const errors = collect(checkKeys(options, ["id", "title", "file", "section", "maxHeight"]), checkPath("file", options.file), checkId(options.id), checkText("title", options.title, 80));
   if (options.section !== undefined && !(typeof options.section === "string" && options.section.trim() && options.section.length <= 120)) errors.push("section must be heading text of at most 120 characters");
   if (options.maxHeight !== undefined && !(Number.isInteger(options.maxHeight) && options.maxHeight >= 100 && options.maxHeight <= 2000)) errors.push("maxHeight must be a whole number of pixels from 100 to 2000");
   return errors;

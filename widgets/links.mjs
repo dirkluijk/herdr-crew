@@ -2,8 +2,26 @@
 // (see server.mjs), and only the exact files listed here; nothing else in the project is reachable.
 import { extname } from "node:path";
 import { projectFile } from "../lib/project-file.mjs";
+import { isObject, checkId, checkText, checkPath, checkKeys, collect } from "../lib/widget-options.mjs";
 
 const RENDER = { ".html": "html", ".htm": "html", ".md": "markdown", ".markdown": "markdown" };
+
+// Stricter than create, which only reports bad links in the panel: used by the CLI before it writes an entry.
+export function validate(options) {
+  if (!isObject(options)) return ["options must be an object"];
+  const errors = collect(checkKeys(options, ["id", "title", "note", "links"]), checkId(options.id), checkText("title", options.title, 80), checkText("note", options.note, 300));
+  if (!Array.isArray(options.links) || !options.links.length || options.links.length > 30) return [...errors, "links must be a list of 1 to 30 links"];
+  options.links.forEach((l, i) => {
+    const at = `links[${i}]`;
+    if (!isObject(l)) return errors.push(`${at} must be an object`);
+    errors.push(...collect(checkKeys(l, ["label", "url", "file", "note", "render"]).map((e) => `${at}: ${e}`), checkText(`${at}.label`, l.label, 80, true), checkText(`${at}.note`, l.note, 300)));
+    if ((l.url === undefined) === (l.file === undefined)) errors.push(`${at} needs exactly one of url or file`);
+    if (l.url !== undefined && !(typeof l.url === "string" && /^https?:\/\/\S+$/i.test(l.url))) errors.push(`${at}.url must be an http or https URL`);
+    if (l.file !== undefined) errors.push(...collect(checkPath(`${at}.file`, l.file)));
+    if (l.render !== undefined && !["html", "markdown", "text"].includes(l.render)) errors.push(`${at}.render must be html, markdown or text`);
+  });
+  return errors;
+}
 
 export default function create({ project, options, language, fileUrl }) {
   const id = options.id ?? "links";

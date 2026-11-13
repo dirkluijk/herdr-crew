@@ -19,6 +19,7 @@ Open http://localhost:5190. You can also run `npx /path/to/herdr-crew --project 
 herdr-crew [serve] [--project DIR] [--port N] [--theme ["free text"]] [--reset-theme] [--theme-avatars] [--no-prompt]
 herdr-crew init [--project DIR] [--plan PLAN.md] [--import personas.json] [--avatars DIR] [--language nl|en] [--port N] [--force]
 herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE] [--avatar KEY] [--traits a,b] [--project DIR]
+herdr-crew widget add --json '<entry>' | widget remove <id> | widget list  [--project DIR]
 herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
 ```
 
@@ -136,6 +137,28 @@ The built-in `markdown` widget shows one project file, or one section of it, ren
 
 `file` is required and is a path relative to the project, without `..` or a leading `/`. Like the links widget, the real path after resolving symlinks must be a file inside the project; the widget checks this again on every read, so a file that is later replaced by a symlink out of the project is refused. Files over 512 kB are refused too. `section` is the text of a heading: the panel shows that heading and everything under it up to the next heading of the same or a higher level (headings inside code blocks do not count). `maxHeight` is the height in pixels of the scroll box, 100 to 2000, default 400. The file is rendered on the server with the same escaping renderer as the files origin, so HTML and scripts in the file show as text. The panel reads the file again when its modification time or size changes, which the page picks up on its next poll, and links to the whole file on the files origin. The id defaults to `markdown`, the title to the file name.
 
+## Add panel
+
+Use the `＋ Panel` button in the header to describe a panel in plain words, up to 500 characters. The dialog shows the exact message before you confirm it. It sends the message to the lead persona (`lead: true` in `.herdr-crew.json`) only when that agent is idle or done and its input box is empty. Otherwise, it explains why it could not send the request (HTTP 409). If there is no lead persona, or the lead is not running in Herdr, the dialog explains that and sends nothing.
+
+The orchestrator turns your request into a `backlog`, `markdown`, `links`, or `dev-server` panel and adds it with `herdr-crew widget add`; the Panels section of the herdr-crew skill tells it how. The server makes no model call and generates no HTML or code. It puts your request as plain text in a fixed template, removes control characters, and never runs the request. `POST /api/panels/request` applies the usual Host, Origin, `X-Crew`, and `confirmed` checks. Every sent request is recorded in `.herdr-crew/actions.log`.
+
+You can manage panels from the CLI:
+
+```sh
+herdr-crew widget add --json '<entry>' [--project DIR]
+herdr-crew widget remove <id> [--project DIR]
+herdr-crew widget list [--project DIR]
+```
+
+`widget add` requires an existing `.herdr-crew.json`. It accepts only the four built-in types, validates each type's options, refuses unknown options, and checks that listed files exist inside the project. It refuses an id already in use. The id comes from `options.id` or defaults to `backlog`, `markdown`, `links`, or `dev-<port>` for the corresponding type. It keeps every other key in `.herdr-crew.json`. A running dashboard picks up the change within a few seconds.
+
+`widget remove` removes the first entry with the given id. Both `add` and `remove` exit 1 with a message on errors.
+
+```sh
+herdr-crew widget add --project . --json '{"module":"markdown","options":{"id":"goals","title":"Goals","file":"PLAN.md","section":"Goal"}}'
+```
+
 ## Safeguards
 
 Go to focuses an agent with `herdr agent focus`; Zoom toggles `herdr pane zoom --toggle`; Screen reads `herdr agent read --source visible`. Card chat sends on Enter only to idle or done agents with an empty input box, and checks both again just before sending; otherwise it answers 409 with the reason. Onboarding messages use the same check. The input box check reads the OpenCode TUI, so prompts to other kinds of agents are refused. Blocked agents have an Answer dialog for allowlisted keys or text, always with confirmation.
@@ -144,7 +167,7 @@ The server listens only on `127.0.0.1`. The Host header must be `localhost` or `
 
 ## Agent skill
 
-The draft skill is at [`skills/herdr-crew/SKILL.md`](skills/herdr-crew/SKILL.md). It covers the crew conventions for every agent, and for the orchestrator how to set up and run the dashboard and how to register and brief new agents. It works next to an orchestration skill such as herdr-orchestrator, which only needs one line pointing to it. It is not installed anywhere. Install it as a symlink to this checkout, for example for OpenCode:
+The draft skill is at [`skills/herdr-crew/SKILL.md`](skills/herdr-crew/SKILL.md). It covers the crew conventions for every agent, and for the orchestrator how to set up and run the dashboard, how to register and brief new agents, and how to turn a panel request into a widget entry. It works next to an orchestration skill such as herdr-orchestrator, which only needs one line pointing to it. It is not installed anywhere. Install it as a symlink to this checkout, for example for OpenCode:
 
 ```sh
 ln -s "$PWD/skills/herdr-crew" ~/.config/opencode/skills/herdr-crew

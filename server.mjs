@@ -18,6 +18,7 @@ import { buildConfig } from "./lib/init.mjs";
 import { renderMarkdown, markdownPage } from "./lib/markdown.mjs";
 import { createHub, createScheduler } from "./lib/live.mjs";
 import { createWidgetSet, removeEntry, removeConfirm } from "./lib/widgets.mjs";
+import { PANEL_TYPES, addWidget, removeWidget, entryId, panelRequestText } from "./lib/panels.mjs";
 
 const APP = dirname(fileURLToPath(import.meta.url));
 const CLI = `node ${join(APP, "server.mjs")}`;
@@ -42,6 +43,10 @@ Usage:
   herdr-crew [serve] [--project DIR] [--port N] [--theme ["free text"]] [--reset-theme] [--theme-avatars] [--no-prompt]
   herdr-crew init [--project DIR] [--plan PLAN.md] [--import personas.json] [--avatars DIR] [--language nl|en] [--port N] [--force]
   herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE] [--avatar KEY] [--project DIR]
+  herdr-crew widget add --json '<entry>' [--project DIR]
+  herdr-crew widget remove <id> [--project DIR]
+  herdr-crew widget list [--project DIR]
+      Adds, removes or lists panels in .herdr-crew.json. Only built-in types: ${Object.keys(PANEL_TYPES).join(", ")}.
   herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
       Waits until the agent is idle or done and its input box is empty, then sends the prompt.
       Exit 0 sent, 2 timeout (default 100000 ms), 1 other errors.
@@ -51,7 +56,7 @@ Model features (lead summary, prompted theme) use ANTHROPIC_FOUNDRY_* or ANTHROP
 theme avatars use OPENAI_FOUNDRY_* or OPENAI_API_KEY. Without them everything degrades to defaults.`;
 
 const args = parseArgs(process.argv.slice(2));
-const command = ["init", "register", "send", "serve", "help"].includes(args._[0]) ? args._.shift() : "serve";
+const command = ["init", "register", "send", "widget", "serve", "help"].includes(args._[0]) ? args._.shift() : "serve";
 const project = resolve(args.project ?? process.cwd());
 
 if (command === "help" || args.help) {
@@ -87,6 +92,46 @@ if (command === "register") {
   }
   console.log(`Registered ${p.agent} as ${p.name}${p.pronouns ? ` (${p.pronouns})` : ""} in ${join(project, CONFIG_FILE)}.`);
   process.exit(0);
+}
+
+const WIDGET_USAGE = "Usage: herdr-crew widget add --json '{\"module\":\"backlog\",\"options\":{...}}' | widget remove <id> | widget list  [--project DIR]";
+if (command === "widget") {
+  const [sub, id] = args._;
+  const file = join(project, CONFIG_FILE);
+  if (!existsSync(file)) {
+    console.error(`No ${CONFIG_FILE} in ${project}; run herdr-crew init first.`);
+    process.exit(1);
+  }
+  if (sub === "add" && typeof args.json === "string") {
+    let entry;
+    try { entry = JSON.parse(args.json); } catch (e) {
+      console.error(`--json is not valid JSON: ${e.message}`);
+      process.exit(1);
+    }
+    const r = await addWidget(file, project, entry);
+    if (r.errors) {
+      console.error(`Panel not added:\n- ${r.errors.join("\n- ")}`);
+      process.exit(1);
+    }
+    console.log(`Added panel ${r.id} to ${file}. A running dashboard shows it within a few seconds.`);
+    process.exit(0);
+  }
+  if (sub === "remove" && id) {
+    const removed = await removeWidget(file, id);
+    if (!removed) {
+      console.error(`No panel with id ${id} in ${file}.`);
+      process.exit(1);
+    }
+    console.log(`Removed panel ${id} (${removed.module}) from ${file}.`);
+    process.exit(0);
+  }
+  if (sub === "list") {
+    const { widgets = [] } = JSON.parse(await readFile(file, "utf8"));
+    for (const w of widgets) console.log(`${entryId(w) ?? "?"}\t${w.module}\t${w.options?.title ?? ""}`);
+    process.exit(0);
+  }
+  console.error(WIDGET_USAGE);
+  process.exit(1);
 }
 
 if (command === "send") {
@@ -172,8 +217,10 @@ const avatarUrl = (p) => {
 
 const crew = await createCrew({ project, stateDir, cfg, avatarUrl });
 const guard = createGuard(PORT);
-const onboarding = createOnboarding({ project, cfg, crew, cli: process.env.HERDR_CREW_CLI ?? CLI });
-const actions = createActions({ project, stateDir, cfg, guard, getSnapshot: crew.getSnapshot, onPrompt: crew.notePrompt, onboarding });
+const cli = process.env.HERDR_CREW_CLI ?? CLI;
+const onboarding = createOnboarding({ project, cfg, crew, cli });
+const panels = { text: (prompt) => panelRequestText({ language: cfg.language, project, cli, prompt }) };
+const actions = createActions({ project, stateDir, cfg, guard, getSnapshot: crew.getSnapshot, onPrompt: crew.notePrompt, onboarding, panels });
 
 // Widgets: "dev-server" loads widgets/dev-server.mjs from this app, a path loads a module relative to the project.
 const FILES_PORT = Number(args["files-port"] ?? cfg.filesPort ?? PORT + 1);

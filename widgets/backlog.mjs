@@ -1,10 +1,11 @@
 // Backlog widget: a read-only mini overview of Backlog.md tasks, from the task list the dashboard already follows
 // (`backlog task list --json --watch`). Rows open the task modal; the widget never changes a task.
+import { isObject, checkId, checkText, checkKeys, collect } from "../lib/widget-options.mjs";
+
 const GROUPS = ["status", "priority", "assignee", "label", "none"];
 const FILTERS = ["status", "labels", "assignee", "priority"];
 const STATUS_ORDER = ["to do", "in progress", "done"];
 const PRIORITY_ORDER = ["high", "medium", "low"];
-const ID = /^[a-z0-9_-]{1,40}$/;
 
 const T = {
   nl: { title: "Backlog", none: "Geen taken voor dit filter.", more: (n) => `en nog ${n}`, off: "Backlog.md staat uit voor dit project (backlog in .herdr-crew.json).", noPriority: "geen prioriteit", nobody: "niemand", noLabel: "geen label", all: "Alle taken" },
@@ -17,10 +18,8 @@ const at = (order, v) => { const i = order.indexOf(lower(v)); return i < 0 ? ord
 
 // Returns a list of problems; empty means valid. Also used by the CLI before it writes an entry.
 export function validate(options) {
-  const errors = [];
-  if (!options || typeof options !== "object" || Array.isArray(options)) return ["options must be an object"];
-  if (options.id !== undefined && !(typeof options.id === "string" && ID.test(options.id))) errors.push("id must match [a-z0-9_-], at most 40 characters");
-  if (options.title !== undefined && !(typeof options.title === "string" && options.title.trim() && options.title.length <= 80)) errors.push("title must be text of at most 80 characters");
+  if (!isObject(options)) return ["options must be an object"];
+  const errors = collect(checkKeys(options, ["id", "title", "filters", "groupBy", "limit"]), checkId(options.id), checkText("title", options.title, 80));
   if (options.filters !== undefined) {
     if (!options.filters || typeof options.filters !== "object" || Array.isArray(options.filters)) errors.push("filters must be an object");
     else for (const [k, v] of Object.entries(options.filters)) {

@@ -505,3 +505,77 @@ test("widgets: backlog and markdown panels render from the config", async () => 
   assert.ok(await until(async () => /Changed\./.test((await widgetViews()).find((v) => v.id === "goals").html)), "markdown not refreshed");
   await writeConfig({ widgets: cfg.widgets });
 });
+
+function crewCli(...argv) {
+  return new Promise((res) => {
+    const p = spawn(process.execPath, [join(APP, "server.mjs"), ...argv], { env: stubEnv, stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    p.stdout.on("data", (c) => (out += c));
+    p.stderr.on("data", (c) => (out += c));
+    p.on("exit", (code) => res({ code, out }));
+  });
+}
+
+test("widget CLI: add validates and writes, the running dashboard shows it, remove takes it out", async () => {
+  const before = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8")).widgets;
+  for (const [json, why] of [
+    ["{not json", /--json is not valid JSON/],
+    ['{"module":"./probe-widget.mjs"}', /module must be one of backlog, markdown, links, dev-server/],
+    ['{"module":"markdown","options":{"file":"../outside.md"}}', /inside the project/],
+    ['{"module":"links","options":{"links":[{"label":"x","file":"page.html"}]}}', /id links already exists/],
+  ]) {
+    const r = await crewCli("widget", "add", "--project", project, "--json", json);
+    assert.equal(r.code, 1, json);
+    assert.match(r.out, why, json);
+  }
+  assert.deepEqual(JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8")).widgets, before);
+
+  let r = await crewCli("widget", "add", "--project", project, "--json", '{"module":"markdown","options":{"id":"notes","title":"Notes","file":"docs/notes.md"}}');
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Added panel notes/);
+  assert.ok(await until(async () => (await widgetViews()).find((v) => v.id === "notes")?.html?.includes("Notes")), "panel not shown");
+  r = await crewCli("widget", "list", "--project", project);
+  assert.match(r.out, /^notes\tmarkdown\tNotes$/m);
+
+  r = await crewCli("widget", "remove", "notes", "--project", project);
+  assert.equal(r.code, 0, r.out);
+  assert.equal((await crewCli("widget", "remove", "notes", "--project", project)).code, 1);
+  assert.deepEqual(JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8")).widgets, before);
+  assert.ok(await until(async () => !(await widgetViews()).some((v) => v.id === "notes")), "panel not removed");
+  assert.equal((await crewCli("widget", "add", "--project", join(root, "nowhere"), "--json", "{}")).code, 1);
+});
+
+test("panel request: guards, no lead, then a quoted message through the draft guard to the lead", async () => {
+  const post = (body, headers = ok()) => api("/api/panels/request", { method: "POST", headers, body });
+  let info = JSON.parse((await api("/api/panels/request")).text);
+  assert.deepEqual({ lead: info.lead, live: info.live, text: info.text }, { lead: null, live: false, text: null });
+  assert.equal((await post({ confirmed: true, prompt: "x" }, { "content-type": "application/json", origin: `http://localhost:${port}` })).status, 403);
+  assert.equal((await post({ prompt: "x" })).status, 400);
+  assert.equal((await post({ confirmed: true, prompt: " \u0007 " })).status, 400);
+  assert.equal((await post({ confirmed: true, prompt: "x".repeat(501) })).status, 400);
+  let r = await post({ confirmed: true, prompt: "a backlog overview" });
+  assert.equal(r.status, 409);
+  assert.match(r.text, /no lead persona/);
+
+  const cfg = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  await writeConfig({ personas: cfg.personas.map((p) => ({ ...p, lead: true })) });
+  assert.ok(await until(async () => JSON.parse((await api("/api/panels/request")).text).live));
+  info = JSON.parse((await api(`/api/panels/request?prompt=${encodeURIComponent("a backlog overview; rm -rf /")}`)).text);
+  assert.equal(info.lead, "m9-probe");
+  assert.match(info.text, /^From the crew dashboard: the user asks for a new panel/);
+  assert.match(info.text, /\n> a backlog overview; rm -rf \/\n/);
+
+  await copyFile(join(SCREENS, "session-draft.ansi"), screenFile);
+  const sent = (await prompts()).length;
+  r = await post({ confirmed: true, prompt: "a backlog overview; rm -rf /" });
+  assert.equal(r.status, 409);
+  assert.match(r.text, /draft in the input box/);
+  assert.equal((await prompts()).length, sent);
+  await copyFile(join(SCREENS, "session-empty.ansi"), screenFile);
+  r = await post({ confirmed: true, prompt: "a backlog overview; rm -rf /" });
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual((await prompts()).at(-1), ["agent", "prompt", "w99:p1", info.text]);
+  const last = (await actionLog()).at(-1);
+  assert.deepEqual(last.slice(1, 3), ["m9-probe (Probe, w99:p1)", "panel request"]);
+  await writeConfig({ personas: cfg.personas });
+});

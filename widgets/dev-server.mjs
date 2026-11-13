@@ -4,6 +4,7 @@ import { execFile, spawn } from "node:child_process";
 import { openSync, closeSync, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { isObject, checkId, checkText, checkPath, checkKeys, collect } from "../lib/widget-options.mjs";
 
 const exec = (cmd, args, cwd, timeout = 10000) =>
   new Promise((res) => execFile(cmd, args, { cwd, timeout }, (err, stdout) => res(err ? "" : String(stdout).trim())));
@@ -19,6 +20,21 @@ const T = {
     confirmStart: (c, cmd, p) => `Runs ${cmd} in ${c} on port ${p}.`, confirmStop: (c, p) => `Stops the process on port ${p} in ${c}.`,
     busy: (p) => `port ${p} is already in use`, timeout: "the server did not come up in time", noDeps: "no node_modules; the widget installs nothing" },
 };
+
+// Used by the CLI before it writes an entry; create itself stays as lenient as before.
+export function validate(options) {
+  if (!isObject(options)) return ["options must be an object"];
+  const errors = collect(
+    checkKeys(options, ["id", "title", "cwd", "command", "port", "pages", "requireNodeModules", "startTimeoutMs"]),
+    checkId(options.id), checkText("title", options.title, 80), checkPath("cwd", options.cwd, false),
+  );
+  if (!(Number.isInteger(options.port) && options.port >= 1024 && options.port <= 65535)) errors.push("port must be a whole number from 1024 to 65535");
+  if (options.command !== undefined && !(Array.isArray(options.command) && options.command.length && options.command.length <= 20 && options.command.every((c) => typeof c === "string" && c && c.length <= 200))) errors.push("command must be a list of 1 to 20 words, without a shell");
+  if (options.pages !== undefined && !(Array.isArray(options.pages) && options.pages.length <= 20 && options.pages.every((p) => isObject(p) && !checkText("title", p.title, 80, true) && typeof p.path === "string" && p.path.length <= 200))) errors.push("pages must be a list of { title, path }");
+  if (options.requireNodeModules !== undefined && typeof options.requireNodeModules !== "boolean") errors.push("requireNodeModules must be true or false");
+  if (options.startTimeoutMs !== undefined && !(Number.isInteger(options.startTimeoutMs) && options.startTimeoutMs >= 1000 && options.startTimeoutMs <= 600000)) errors.push("startTimeoutMs must be from 1000 to 600000");
+  return errors;
+}
 
 export default function create({ project, stateDir, options, language }) {
   const t = T[language] ?? T.en;

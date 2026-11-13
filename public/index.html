@@ -241,7 +241,7 @@
 <header>
   <h1 id="title">Crew</h1>
   <div class="counts" id="counts"></div>
-  <div class="updated" id="updbox"><span id="updated">…</span><button id="layoutbtn"></button><button id="themebtn">🎨</button></div>
+  <div class="updated" id="updbox"><span id="updated">…</span><button id="layoutbtn"></button><button id="panelbtn"></button><button id="themebtn">🎨</button></div>
 </header>
 <div class="tagline" id="tagline" style="padding: 0 2rem"></div>
 <div id="banner"></div>
@@ -284,6 +284,12 @@ const I18N = {
     dialogTitle: (n) => `Dialoog van ${n} beantwoorden`, dialogHint: "Kies toetsen in volgorde, of typ een eigen antwoord. Je bevestigt daarna nog een keer.", ownAnswer: "Of: eigen antwoord als tekst (zonder Enter)",
     keysLbl: "toetsen in dialoog", textLbl: "tekst in dialoog", log: "Log", hideLog: "Log verbergen", running: "draait",
     removePanel: "Paneel verwijderen", remove: "Verwijderen",
+    addPanel: "＋ Paneel", addPanelTitle: "Paneel toevoegen", panelPh: "Bijvoorbeeld: een mini-overzicht van alle open taken, of een link naar PLAN.md",
+    panelHint: (n) => `Beschrijf in gewone woorden welk paneel je wilt. ${n} maakt er een paneel van met een ingebouwd type (links, backlog, markdown of dev-server) en voegt het toe; er wordt geen HTML of code gemaakt. Je ziet het bericht nog voordat het verstuurd wordt.`,
+    panelNoLead: "Er staat geen lead persona in .herdr-crew.json (lead: true), dus er is niemand die het paneel kan maken.",
+    panelNotLive: (n) => `${n} draait nu niet in Herdr. Start de orchestrator en probeer het daarna opnieuw.`,
+    panelBusy: (n) => `${n} is nog bezig. Het bericht gaat alleen weg als ${n} wacht of klaar is en het invoerveld leeg is.`,
+    panelSent: (n) => `Verstuurd naar ${n}. Het nieuwe paneel verschijnt vanzelf zodra het is toegevoegd.`,
     themeTitle: "Thema", themeHint: "Beschrijf een thema in vrije tekst. Alleen deze tekst en de projectnaam gaan naar het model, en voor avatars ook naam, rol en karakter van de persona's.",
     themeNow: (n) => n ? `Huidig thema: <b>${n}</b>` : "Standaardthema", themeGen: "Genereer", themeReset: "Terug naar standaard", themeAvatars: "Avatars in dit thema", themeBusy: "thema genereren… (kan een halve minuut duren)",
     noModel: "Geen modeltoegang op de server; het standaardthema blijft staan.",
@@ -314,6 +320,12 @@ const I18N = {
     dialogTitle: (n) => `Answer ${n}'s dialog`, dialogHint: "Pick keys in order, or type your own answer. You confirm once more after this.", ownAnswer: "Or: your own answer as text (without Enter)",
     keysLbl: "keys in dialog", textLbl: "text in dialog", log: "Log", hideLog: "Hide log", running: "running",
     removePanel: "Remove panel", remove: "Remove",
+    addPanel: "＋ Panel", addPanelTitle: "Add a panel", panelPh: "For example: a mini overview of all open tasks, or a link to PLAN.md",
+    panelHint: (n) => `Describe in plain words which panel you want. ${n} turns it into a panel of a built-in type (links, backlog, markdown or dev-server) and adds it; no HTML or code is generated. You see the message before it is sent.`,
+    panelNoLead: "There is no lead persona in .herdr-crew.json (lead: true), so nobody can make the panel.",
+    panelNotLive: (n) => `${n} is not running in Herdr right now. Start the orchestrator and try again.`,
+    panelBusy: (n) => `${n} is still busy. The message only goes out when ${n} is waiting or done and the input box is empty.`,
+    panelSent: (n) => `Sent to ${n}. The new panel shows up by itself once it is added.`,
     themeTitle: "Theme", themeHint: "Describe a theme in free text. Only this text and the project name go to the model, plus persona name, role and traits for avatars.",
     themeNow: (n) => n ? `Current theme: <b>${n}</b>` : "Default theme", themeGen: "Generate", themeReset: "Back to default", themeAvatars: "Avatars in this theme", themeBusy: "generating theme… (can take half a minute)",
     noModel: "No model access on the server; the default theme stays.",
@@ -803,6 +815,36 @@ function openTheme() {
 }
 document.getElementById("themebtn").onclick = openTheme;
 
+async function openAddPanel() {
+  let info;
+  try { info = await api("api/panels/request"); } catch (e) { return alert(e.message); }
+  const name = info.leadName ?? "";
+  const problem = !info.lead ? L.panelNoLead : !info.live ? L.panelNotLive(name) : null;
+  showModal(`<h3>${esc(L.addPanelTitle)}</h3>
+    ${problem ? `<p class="warn">${esc(problem)}</p>` : `<p class="hint">${esc(L.panelHint(name))}</p>
+    <textarea name="panel" rows="3" maxlength="${Number(info.max) || 500}" placeholder="${esc(L.panelPh)}"></textarea>
+    ${info.status === "working" ? `<p class="warn">${esc(L.panelBusy(name))}</p>` : ""}`}
+    <div class="err"></div>
+    <div class="row"><button data-close>${L.cancel}</button>${problem ? "" : `<button class="primary" data-next>${L.next}</button>`}</div>`);
+  const next = modal.querySelector("[data-next]");
+  if (!next) return;
+  modal.querySelector("textarea").focus();
+  next.onclick = async () => {
+    const prompt = modal.querySelector("textarea").value.trim();
+    if (!prompt) return;
+    try {
+      const r = await api(`api/panels/request?prompt=${encodeURIComponent(prompt)}`);
+      const target = agentById(r.lead);
+      if (!r.live || !target) throw new Error(L.panelNotLive(r.leadName ?? name));
+      confirmStep(target, L.addPanelTitle, r.text, async () => {
+        await api("api/panels/request", { confirmed: true, prompt });
+        showToast(L.panelSent(target.name));
+      });
+    } catch (e) { modal.querySelector(".err").textContent = e.message; }
+  };
+}
+document.getElementById("panelbtn").onclick = openAddPanel;
+
 document.addEventListener("click", async (ev) => {
   const t = ev.target.closest("button");
   if (!t) return;
@@ -1002,6 +1044,7 @@ document.addEventListener("click", async (ev) => {
   const lb = document.getElementById("layoutbtn");
   lb.textContent = L.resetLayout;
   lb.title = L.resetLayoutTitle;
+  document.getElementById("panelbtn").textContent = L.addPanel;
   document.getElementById("updated").textContent = L.connecting;
   pollWidgets();
   const es = new EventSource("events");
