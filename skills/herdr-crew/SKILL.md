@@ -67,7 +67,7 @@ Only do this when the user asks for a crew dashboard or agrees to your proposal.
 3. Check `herdr pane read <new-pane-id> --source recent-unwrapped --lines 10` for the line with the URL (default http://localhost:5190) and give the user that URL.
 4. Note the pane ID and URL in the plan or the project task, so a later session can find the running dashboard.
 
-The server reloads `.herdr-crew.json` on its own. Restart it only for a new port or new widgets, and only after asking.
+The server reloads `.herdr-crew.json` on its own, including personas and widgets. Restart it only for a new port or changed widget module code, and only after asking.
 
 ### Starting agents
 

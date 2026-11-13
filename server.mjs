@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { readFile, writeFile, stat } from "node:fs/promises";
 import { existsSync, realpathSync } from "node:fs";
 import { join, dirname, resolve, extname } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
 import { createHash } from "node:crypto";
 import { loadConfig, saveConfig, stateDir as makeStateDir, CONFIG_FILE } from "./lib/config.mjs";
@@ -17,6 +17,7 @@ import { modelEndpoint } from "./lib/summary.mjs";
 import { buildConfig } from "./lib/init.mjs";
 import { renderMarkdown, markdownPage } from "./lib/markdown.mjs";
 import { createHub, createScheduler } from "./lib/live.mjs";
+import { createWidgetSet, removeEntry, removeConfirm } from "./lib/widgets.mjs";
 
 const APP = dirname(fileURLToPath(import.meta.url));
 const CLI = `node ${join(APP, "server.mjs")}`;
@@ -177,18 +178,16 @@ const actions = createActions({ project, stateDir, cfg, guard, getSnapshot: crew
 // Widgets: "dev-server" loads widgets/dev-server.mjs from this app, a path loads a module relative to the project.
 const FILES_PORT = Number(args["files-port"] ?? cfg.filesPort ?? PORT + 1);
 const fileUrl = (widgetId, key) => `http://localhost:${FILES_PORT}/files/${encodeURIComponent(widgetId)}/${encodeURIComponent(key)}`;
-const widgets = [];
-for (const w of cfg.widgets ?? []) {
-  try {
-    const spec = /^[a-z0-9-]+$/.test(w.module) ? join(APP, "widgets", `${w.module}.mjs`) : resolve(project, w.module);
-    const mod = await import(pathToFileURL(spec).href);
-    widgets.push(mod.default({ project, stateDir, options: w.options ?? {}, language: cfg.language, fileUrl }));
-  } catch (e) {
-    say(`widget ${w.module} not loaded: ${e.message}`);
-  }
+const widgets = createWidgetSet({ app: APP, project, stateDir, fileUrl, say });
+let filesServer = null;
+async function syncWidgets() {
+  const r = await widgets.sync(cfg.widgets ?? [], cfg.language);
+  ensureFilesServer();
+  return r;
 }
+await syncWidgets();
 
-// Picks up personas added with `herdr-crew register` or by hand, without a restart.
+// Picks up personas and widgets added with `herdr-crew register` or by hand, without a restart.
 let configMtime = existsSync(cfg.file) ? (await stat(cfg.file)).mtimeMs : 0;
 async function reloadConfig() {
   if (!existsSync(cfg.file)) return;
@@ -197,8 +196,9 @@ async function reloadConfig() {
   configMtime = m;
   try {
     const next = await loadConfig(project);
-    for (const k of ["title", "language", "bubbleLanguage", "personas", "theme", "onboarding", "summaries", "terminalApp", "avatarDir", "confirm"]) cfg[k] = next[k];
-    say("config reloaded");
+    for (const k of ["title", "language", "bubbleLanguage", "personas", "theme", "onboarding", "summaries", "terminalApp", "avatarDir", "confirm", "widgets"]) cfg[k] = next[k];
+    const w = await syncWidgets();
+    say(`config reloaded${w.added || w.removed ? `; widgets: ${w.added} new, ${w.removed} removed` : ""}`);
   } catch (e) {
     say(`config not reloaded: ${e.message}`);
   }
@@ -220,7 +220,7 @@ function publicConfig() {
     version: VERSION, title: cfg.title, layoutKey: LAYOUT_KEY, language: cfg.language, bubbleLanguage: cfg.bubbleLanguage, backlog: cfg.backlog,
     lead: cfg.personas.find((p) => p.lead)?.name ?? null, onboardingVia: cfg.onboarding.via, confirmPrompt: !!cfg.confirm?.prompt,
     theme: cfg.theme ?? null, themeModel: !!modelEndpoint(), themeAvatars: !!imageEndpoint(), avatarJob: !!avatarJob,
-    widgets: widgets.map((w) => ({ id: w.id, title: w.title })),
+    widgets: widgets.list().map((w) => ({ id: w.id, title: w.title })),
   };
 }
 
@@ -230,21 +230,37 @@ async function handleWidgets(req, res, url) {
   const [, id, action] = m;
   if (!id) {
     if (req.method !== "GET") return send(res, 405, { error: "method not allowed" }), true;
-    const views = await Promise.all(widgets.map(async (w) => ({ id: w.id, title: w.title, hasLog: !!w.log, ...(await w.view()) })));
+    const views = await Promise.all(widgets.list().map(async (w) => {
+      const view = await Promise.resolve().then(() => w.view()).catch((e) => ({ state: "off", error: e.message }));
+      return { id: w.id, title: w.title, hasLog: !!w.log, ...view };
+    }));
     return send(res, 200, views), true;
   }
-  const w = widgets.find((x) => x.id === id);
+  const w = widgets.find(id);
   if (!w) return send(res, 404, { error: "unknown widget" }), true;
+  // "remove" is reserved for the dashboard: it removes the entry from .herdr-crew.json, whatever the widget is.
+  const isRemove = action === "remove";
+  const act = action && Object.hasOwn(w.actions, action) ? w.actions[action] : null;
   if (req.method === "GET" && action === "log") return send(res, 200, { text: await w.log?.() ?? "" }), true;
-  if (req.method === "GET" && w.actions[action]) return send(res, 200, { confirm: w.actions[action].confirm() }), true;
+  if (req.method === "GET" && isRemove) return send(res, 200, { confirm: removeConfirm(cfg.language, w) }), true;
+  if (req.method === "GET" && act) return send(res, 200, { confirm: act.confirm() }), true;
   if (req.method !== "POST") return send(res, 405, { error: "method not allowed" }), true;
   if (!guard.originOk(req)) return send(res, 403, { error: "origin not allowed" }), true;
   let body;
   try { body = await readBody(req); } catch { return send(res, 400, { error: "bad body" }), true; }
-  if (!w.actions[action]) return send(res, 404, { error: "unknown action" }), true;
+  if (!isRemove && !act) return send(res, 404, { error: "unknown action" }), true;
   if (body.confirmed !== true) return send(res, 400, { error: "not confirmed" }), true;
-  try { await w.actions[action].run(); } catch (e) { return send(res, 409, { error: e.message }), true; }
-  await actions.log(`widget ${w.id}`, action, w.actions[action].confirm());
+  if (isRemove) {
+    const json = widgets.entryJson(id);
+    const left = json && await removeEntry(cfg.file, json);
+    if (!left) return send(res, 409, { error: `${CONFIG_FILE} changed; reload and try again` }), true;
+    cfg.widgets = left;
+    await syncWidgets();
+    await actions.log(`widget ${w.id}`, "remove", JSON.parse(json));
+    return send(res, 200, { ok: true }), true;
+  }
+  try { await act.run(); } catch (e) { return send(res, 409, { error: e.message }), true; }
+  await actions.log(`widget ${w.id}`, action, act.confirm());
   return send(res, 202, { ok: true }), true;
 }
 
@@ -320,20 +336,21 @@ createServer(async (req, res) => {
 }).listen(PORT, "127.0.0.1", () => say(`crew dashboard for ${cfg.title} on http://localhost:${PORT}`));
 
 // Files origin: a second listener on its own port, so served pages (which may run scripts, like a slide deck)
-// cannot call the dashboard API and keep their own localStorage. Only the files that widgets list are reachable.
-const servedFiles = new Map();
-for (const w of widgets) for (const [key, f] of Object.entries(w.files ?? {})) servedFiles.set(`${w.id}/${key}`, f);
-if (servedFiles.size) {
+// cannot call the dashboard API and keep their own localStorage. Only the files that widgets list right now are
+// reachable. It starts once the first widget lists a file and keeps running after that.
+function ensureFilesServer() {
+  if (filesServer || !widgets.fileCount()) return;
   const filesHosts = new Set([`localhost:${FILES_PORT}`, `127.0.0.1:${FILES_PORT}`]);
   const projectReal = realpathSync(project);
-  createServer(async (req, res) => {
+  filesServer = createServer(async (req, res) => {
     const deny = (code, text) => { res.writeHead(code, { "content-type": "text/plain" }); res.end(text); };
     if (!filesHosts.has(req.headers.host ?? "")) return deny(421, "wrong host");
     if (req.method !== "GET" && req.method !== "HEAD") return deny(405, "read only");
     // Navigation from the dashboard or a typed URL is fine; fetches from other sites are not.
     if (req.headers["sec-fetch-site"] === "cross-site") return deny(403, "cross-site");
     const m = new URL(req.url, "http://localhost").pathname.match(/^\/files\/([^/]+)\/([^/]+)$/);
-    const f = m && servedFiles.get(`${decodeURIComponent(m[1])}/${decodeURIComponent(m[2])}`);
+    let f = null;
+    try { f = m && widgets.file(decodeURIComponent(m[1]), decodeURIComponent(m[2])); } catch {}
     if (!f) return deny(404, "not found");
     let real;
     try { real = realpathSync(f.path); } catch { return deny(404, "not found"); }
@@ -351,7 +368,9 @@ if (servedFiles.size) {
     }
     res.writeHead(200, { ...headers, "content-type": "text/plain; charset=utf-8" });
     res.end(req.method === "HEAD" ? undefined : body);
-  }).listen(FILES_PORT, "127.0.0.1", () => say(`files for widgets on http://localhost:${FILES_PORT}/files/ (${servedFiles.size} files)`));
+  });
+  filesServer.on("error", (e) => say(`files origin on port ${FILES_PORT} not started: ${e.message}`));
+  filesServer.listen(FILES_PORT, "127.0.0.1", () => say(`files for widgets on http://localhost:${FILES_PORT}/files/ (${widgets.fileCount()} files)`));
 }
 
 function loop(fn, ms) {

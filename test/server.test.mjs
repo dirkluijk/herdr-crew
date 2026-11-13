@@ -414,3 +414,61 @@ test("tasks: unknown ids 404, bad ids and other methods 400", async () => {
   for (const path of ["/api/tasks/not-a-task", "/api/tasks/..%2Fx", "/api/tasks/NEW-1/edit"]) assert.equal((await api(path)).status, 400, path);
   assert.equal((await api("/api/tasks/NEW-1", { method: "POST", headers: ok(), body: { confirmed: true } })).status, 400);
 });
+
+const writeConfig = async (patch) => {
+  const file = join(project, ".herdr-crew.json");
+  await writeFile(file, JSON.stringify({ ...JSON.parse(await readFile(file, "utf8")), ...patch }));
+};
+const widgetViews = async () => JSON.parse((await api("/api/widgets")).text);
+async function until(check, ms = 10000) {
+  for (const end = Date.now() + ms; Date.now() < end; await sleep(200)) if (await check()) return true;
+  return false;
+}
+
+test("widgets: adding, changing and removing an entry shows up without restart", async () => {
+  const cfg = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  const docs = { module: "links", options: { id: "docs", title: "Docs", links: [{ label: "Secret", file: "secret.txt" }] } };
+  await writeConfig({ widgets: [...cfg.widgets, docs] });
+  assert.ok(await until(async () => (await widgetViews()).some((v) => v.id === "docs")), "docs widget not added");
+  assert.equal((await files("/files/docs/0-secret.txt")).text, "not listed");
+  assert.ok(JSON.parse((await api("/api/config")).text).widgets.some((w) => w.id === "docs"));
+
+  await writeConfig({ widgets: [...cfg.widgets, { ...docs, options: { ...docs.options, title: "Docs 2" } }] });
+  assert.ok(await until(async () => (await widgetViews()).find((v) => v.id === "docs")?.title === "Docs 2"), "docs widget not changed");
+
+  await writeConfig({ widgets: cfg.widgets });
+  assert.ok(await until(async () => !(await widgetViews()).some((v) => v.id === "docs")), "docs widget not removed");
+  assert.equal((await files("/files/docs/0-secret.txt")).status, 404);
+  assert.equal((await files("/files/links/0-notes.md")).status, 200);
+});
+
+test("widgets: a panel is removed from the dashboard only after confirmation, and logged", async () => {
+  const cfg = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  const extra = { module: "links", options: { id: "extra", title: "Extra", links: [{ label: "Notes", file: "docs/notes.md" }] } };
+  await writeConfig({ widgets: [...cfg.widgets, extra] });
+  assert.ok(await until(async () => (await widgetViews()).some((v) => v.id === "extra")));
+
+  const confirm = JSON.parse((await api("/api/widgets/extra/remove")).text).confirm;
+  assert.match(confirm, /Removes the panel Extra \(extra\) from \.herdr-crew\.json/);
+  assert.equal((await api("/api/widgets/extra/remove", { method: "POST", headers: { "content-type": "application/json", "x-crew": "1" }, body: { confirmed: true } })).status, 403);
+  assert.equal((await api("/api/widgets/extra/remove", { method: "POST", headers: ok(), body: {} })).status, 400);
+  assert.equal((await api("/api/widgets/extra/remove", { method: "GET", host: "evil.example" })).status, 421);
+  assert.ok((await widgetViews()).some((v) => v.id === "extra"));
+
+  const r = await api("/api/widgets/extra/remove", { method: "POST", headers: ok(), body: { confirmed: true } });
+  assert.equal(r.status, 200);
+  assert.ok(!(await widgetViews()).some((v) => v.id === "extra"));
+  assert.deepEqual(JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8")).widgets, cfg.widgets);
+  assert.equal((await files("/files/extra/0-notes.md")).status, 404);
+  const last = (await actionLog()).at(-1);
+  assert.deepEqual(last.slice(1, 3), ["widget extra", "remove"]);
+  assert.deepEqual(JSON.parse(last[3]), extra);
+  assert.equal((await api("/api/widgets/extra/remove", { method: "POST", headers: ok(), body: { confirmed: true } })).status, 404);
+});
+
+test("widgets: inherited property names are no actions", async () => {
+  for (const action of ["constructor", "tostring"]) {
+    assert.equal((await api(`/api/widgets/probe/${action}`)).status, 405, action);
+    assert.equal((await api(`/api/widgets/probe/${action}`, { method: "POST", headers: ok(), body: { confirmed: true } })).status, 404, action);
+  }
+});

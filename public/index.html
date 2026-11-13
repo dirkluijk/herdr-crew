@@ -167,6 +167,9 @@
   .widget .btns button:disabled { opacity: 0.35; cursor: not-allowed; }
   .widget a.url { color: var(--accent2); }
   .widget .btns:empty { display: none; }
+  .widget .state .wremove { margin-left: auto; width: 1.6rem; height: 1.6rem; padding: 0; border-radius: 8px; border: 1px solid #ffffff22; background: transparent; color: var(--muted); line-height: 1; opacity: 0; transition: opacity .15s; }
+  .widget:hover .wremove, .widget:focus-within .wremove { opacity: 1; }
+  .widget .state .wremove:hover, .widget .state .wremove:focus-visible { background: var(--blocked); color: var(--bg); outline: none; }
   .linklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
   .linklist a { color: var(--accent); font-weight: 600; text-decoration: none; } .linklist a:hover { text-decoration: underline; }
   .linklist a.off { opacity: 0.4; pointer-events: none; }
@@ -270,6 +273,7 @@ const I18N = {
     name: "Naam", pronouns: "Voornaamwoorden", role: "Rol",
     dialogTitle: (n) => `Dialoog van ${n} beantwoorden`, dialogHint: "Kies toetsen in volgorde, of typ een eigen antwoord. Je bevestigt daarna nog een keer.", ownAnswer: "Of: eigen antwoord als tekst (zonder Enter)",
     keysLbl: "toetsen in dialoog", textLbl: "tekst in dialoog", log: "Log", hideLog: "Log verbergen", running: "draait",
+    removePanel: "Paneel verwijderen", remove: "Verwijderen",
     themeTitle: "Thema", themeHint: "Beschrijf een thema in vrije tekst. Alleen deze tekst en de projectnaam gaan naar het model, en voor avatars ook naam, rol en karakter van de persona's.",
     themeNow: (n) => n ? `Huidig thema: <b>${n}</b>` : "Standaardthema", themeGen: "Genereer", themeReset: "Terug naar standaard", themeAvatars: "Avatars in dit thema", themeBusy: "thema genereren… (kan een halve minuut duren)",
     noModel: "Geen modeltoegang op de server; het standaardthema blijft staan.",
@@ -299,6 +303,7 @@ const I18N = {
     name: "Name", pronouns: "Pronouns", role: "Role",
     dialogTitle: (n) => `Answer ${n}'s dialog`, dialogHint: "Pick keys in order, or type your own answer. You confirm once more after this.", ownAnswer: "Or: your own answer as text (without Enter)",
     keysLbl: "keys in dialog", textLbl: "text in dialog", log: "Log", hideLog: "Hide log", running: "running",
+    removePanel: "Remove panel", remove: "Remove",
     themeTitle: "Theme", themeHint: "Describe a theme in free text. Only this text and the project name go to the model, plus persona name, role and traits for avatars.",
     themeNow: (n) => n ? `Current theme: <b>${n}</b>` : "Default theme", themeGen: "Generate", themeReset: "Back to default", themeAvatars: "Avatars in this theme", themeBusy: "generating theme… (can take half a minute)",
     noModel: "No model access on the server; the default theme stays.",
@@ -915,7 +920,8 @@ const widgetLog = {};
 let widgetViews = [];
 function widgetPanel(w) {
   return `<div class="widget">
-    <div class="state">${w.list ? "" : `<span class="dot ${w.state}"></span>`}<b>${esc(w.title)}</b> ${w.list ? "" : `<span>${w.url ? `<a class="url" href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.text)}</a>` : esc(w.text ?? "")}</span>`}</div>
+    <div class="state">${w.list ? "" : `<span class="dot ${w.state}"></span>`}<b>${esc(w.title)}</b> ${w.list ? "" : `<span>${w.url ? `<a class="url" href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.text)}</a>` : esc(w.text ?? "")}</span>`}
+      <button class="wremove" data-widget="${esc(w.id)}" data-waction="remove" data-label="${esc(L.removePanel)}" title="${esc(L.removePanel)}" aria-label="${esc(L.removePanel)}: ${esc(w.title)}">✕</button></div>
     ${w.list && w.text ? `<div class="hint">${esc(w.text)}</div>` : ""}
     ${(w.info ?? []).map((i) => `<div class="info">${esc(i)}</div>`).join("")}
     ${w.warning ? `<div class="warn">${esc(w.warning)}</div>` : ""}${w.error ? `<div class="err">${esc(w.error)}</div>` : ""}
@@ -927,6 +933,7 @@ function widgetPanel(w) {
   </div>`;
 }
 function renderWidgets() {
+  setText("h-widgets", widgetViews.length ? config.theme?.sections?.widgets ?? L.sections.widgets : "");
   document.getElementById("widgets").innerHTML = widgetViews.map(widgetPanel).join("");
   for (const w of widgetViews) if (widgetLog[w.id]) api(`api/widgets/${w.id}/log`).then((r) => {
     const pre = document.querySelector(`pre[data-wlog="${CSS.escape(w.id)}"]`);
@@ -934,9 +941,8 @@ function renderWidgets() {
   }).catch(() => {});
 }
 async function pollWidgets() {
-  if (config.widgets.length) {
-    try { widgetViews = await api("api/widgets"); renderWidgets(); } catch {}
-  }
+  // Always polled, so panels added to .herdr-crew.json show up without a reload.
+  try { widgetViews = await api("api/widgets"); renderWidgets(); } catch {}
   setTimeout(pollWidgets, widgetViews.some((w) => w.busy) ? 2000 : 6000);
 }
 document.addEventListener("click", async (ev) => {
@@ -946,8 +952,8 @@ document.addEventListener("click", async (ev) => {
   if (waction === "log") { widgetLog[widget] = !widgetLog[widget]; return renderWidgets(); }
   const w = widgetViews.find((x) => x.id === widget);
   const { confirm } = await api(`api/widgets/${widget}/${waction}`);
-  showModal(`<h3>${L.confirm}: ${esc(w.title)} · ${esc(b.textContent)}</h3><pre>${esc(confirm)}</pre><p class="hint">${L.serverCheck}</p><div class="err"></div>
-    <div class="row"><button data-close>${L.cancel}</button><button class="danger" data-confirm>${L.run}</button></div>`);
+  showModal(`<h3>${L.confirm}: ${esc(w.title)} · ${esc(b.dataset.label ?? b.textContent)}</h3><pre>${esc(confirm)}</pre><p class="hint">${L.serverCheck}</p><div class="err"></div>
+    <div class="row"><button data-close>${L.cancel}</button><button class="danger" data-confirm>${waction === "remove" ? L.remove : L.run}</button></div>`);
   modal.querySelector("[data-confirm]").onclick = async (e) => {
     e.target.disabled = true;
     try { await api(`api/widgets/${widget}/${waction}`, { confirmed: true }); modal.close(); widgetViews = await api("api/widgets"); renderWidgets(); }
