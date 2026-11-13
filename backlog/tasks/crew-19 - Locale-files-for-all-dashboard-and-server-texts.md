@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@m5-panels'
 created_date: '2026-11-13 13:22'
-updated_date: '2026-11-13 14:09'
+updated_date: '2026-11-13 14:10'
 labels:
   - i18n
   - ui
@@ -50,6 +50,8 @@ Scope note: English-only HTTP API errors and CLI output (no nl branch before, e.
 Themes: validateTheme already built only flavour fields; flavourTheme now also filters saved themes before /api/config (labels only status keys, sections only section keys, no other texts). Theme prompt UI language: the model may return uiLanguage (code); set when the locale exists (logged as language set via theme), otherwise the page shows that it can be added (CREW-20). Not testable end to end without a model; uiLanguage parsing has a unit test.
 Look unchanged: compared the old inline I18N block (git HEAD) with the new locales for nl and en, all strings and the function outputs (banner, closeText, onboardTitle, informed, ...) are identical; ui.you moved to crew.you, ui.running was unused. Time format kept: en uses en-GB.
 Validation: npm test 169/169, npm run check ok, page script syntax checked. New test/i18n.test.mjs: shipped locales vs en.json, checkLocale errors, fallback and extra dirs, page and server only use existing keys, no inline text block in the page, onboarding wording, theme flavour filtering. Server tests: locale in /api/config, /api/language guards, set nl with pinned bubbleLanguage, widget recreated, unknown language falls back to en, saved theme filtered. Manual: own instance on 5277 with stub herdr and the Ruimtestation theme in nl: same texts as before, picker switched to English without restart, Close dialog in English, bubbleLanguage stayed nl.
+
+crew-orch 2026-11-13: rebased onto main, npm test 169 pass, locales are in package.json files; fast-forward merged as b168a0e and pushed. Restarted 5192 and 5190; 5190 still loads language nl with the Night theme.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
