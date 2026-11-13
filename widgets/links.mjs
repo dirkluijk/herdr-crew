@@ -3,6 +3,7 @@
 import { extname } from "node:path";
 import { projectFile } from "../lib/project-file.mjs";
 import { isObject, checkId, checkText, checkPath, checkKeys, collect } from "../lib/widget-options.mjs";
+import { tr } from "../lib/i18n.mjs";
 
 const RENDER = { ".html": "html", ".htm": "html", ".md": "markdown", ".markdown": "markdown" };
 
@@ -41,14 +42,14 @@ export default function create({ project, options, language, fileUrl }) {
       files[key] = { path, render: ["html", "markdown", "text"].includes(l.render) ? l.render : RENDER[extname(path).toLowerCase()] ?? "text", source: String(l.file) };
       return { title: label, note, url: fileUrl(id, key), file: String(l.file) };
     } catch (e) {
-      problems.push(`${label}: ${l.file} ${e.code === "ENOENT" ? (language === "nl" ? "bestaat niet" : "does not exist") : e.message}`);
+      problems.push(`${label}: ${l.file} ${e.code === "ENOENT" ? tr(language)("widget.links.missing") : e.message}`);
       return { title: label, note, url: null, file: String(l.file) };
     }
   });
 
   return {
     id,
-    title: options.title ?? (language === "nl" ? "Links" : "Links"),
+    title: options.title ?? tr(language)("widget.links.title"),
     files,
     async view() {
       return {

@@ -35,7 +35,7 @@ herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
 | --- | --- |
 | `id` | Optional stable project id for the browser layout key; defaults to a hash of the project path. |
 | `title` | Dashboard title. |
-| `language` | UI language, `nl` or `en`. |
+| `language` | UI language: a locale in `locales/`, `nl` or `en`; see Languages. Unknown values show English. |
 | `bubbleLanguage` | Language for agent speech bubbles. |
 | `port` | HTTP port; defaults to `5190`. |
 | `workspace` | Optional Herdr workspace ID. Otherwise use `HERDR_WORKSPACE_ID` or the workspace where most agents have their cwd in the project. |
@@ -72,6 +72,16 @@ State lives in `<project>/.herdr-crew/`: `memory.json` (recent bubbles, incoming
 Live agents missing from the config, and registered agents without a bubble yet, appear in New on board with a new or not registered badge. A banner lists them. Register adds a persona from the dashboard, prefilled from the tab label. Informed agents leave the New section; the dashboard remembers that they were informed.
 
 By default, with a lead persona and `onboarding.via` set to `orchestrator`, Inform and the banner button send one confirmed message to the orchestrator when it is idle or done. The message asks the lead to give each agent a persona, register it with the exact `herdr-crew register` command shown, and pass on the crew conventions. With `via: "direct"` or no lead, the message goes to the agent instead and explains bubbles and message prefixes.
+
+## Languages
+
+All texts of the page and the server come from locale files: `locales/en.json` and `locales/nl.json` in this checkout. Each file is one flat JSON object with the same keys, and placeholders such as `{name}` are filled in by the page or the server. The page gets the active locale through `/api/config`; no other files are served. `language` in `.herdr-crew.json` picks the file. An unknown language shows English, and a key that is missing in a locale shows the English text. `bubbleLanguage` is separate and only sets the language of agent bubbles and the lead summary.
+
+The 🌐 button in the header lists the available languages. Choosing one writes `language` to `.herdr-crew.json` after a confirmation and logs it in `.herdr-crew/actions.log`; the page switches without a restart. If the file has no `bubbleLanguage` yet, the current one is written along with it, so the agents keep their bubble language.
+
+The test suite checks that every locale has exactly the keys and placeholders of `en.json` and no empty texts. Error messages of the HTTP API and the CLI stay in English.
+
+A theme only changes flavour texts: the title, the tagline, the status labels and the section headings. Confirmations, errors, guard texts and onboarding messages always come from the locale file; the server drops any other text from a saved theme before the page sees it. If a theme prompt asks for a UI language, for example "space station, UI in English", and that locale exists, the dashboard switches to it. If it does not exist, the dialog says that it can be added as a new language.
 
 ## Prompted theme
 

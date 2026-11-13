@@ -688,3 +688,41 @@ test("agents: Zoom and Screen are gone, the Answer dialog still reads the screen
   assert.doesNotMatch(page, /data-act="zoom"|data-act="screen"|openScreens|⤢ Zoom|▤ Scherm|▤ Screen/);
   assert.match(page, /api\/agents\/\$\{encodeURIComponent\(a\.id\)\}\/screen/);
 });
+
+test("language: the page gets the locale; the picker writes language after confirmation and keeps the bubble language", async () => {
+  let c = JSON.parse((await api("/api/config")).text);
+  assert.equal(c.language, "en");
+  assert.equal(c.locale["ui.cancel"], "Cancel");
+  assert.deepEqual(c.languages.map((l) => l.code), ["en", "nl"]);
+  const post = (body, headers = ok()) => api("/api/language", { method: "POST", headers, body });
+  assert.equal((await post({ language: "nl" }, { "content-type": "application/json", "x-crew": "1" })).status, 403);
+  assert.equal((await post({ language: "nl" })).status, 400);
+  assert.match((await post({ confirmed: true, language: "xx" })).text, /unknown language/);
+  const r = await post({ confirmed: true, language: "nl" });
+  assert.equal(r.status, 200, r.text);
+  const raw = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  assert.equal(raw.language, "nl");
+  assert.equal(raw.bubbleLanguage, "en");
+  c = JSON.parse((await api("/api/config")).text);
+  assert.equal(c.language, "nl");
+  assert.equal(c.locale["ui.cancel"], "Annuleren");
+  assert.deepEqual((await actionLog()).at(-1).slice(1, 3), ["language", "set"]);
+  assert.ok(await until(async () => (await widgetViews()).find((v) => v.id === "links")?.title === "Links"));
+
+  await writeConfig({ language: "zz" });
+  assert.ok(await until(async () => JSON.parse((await api("/api/config")).text).languageSetting === "zz"));
+  c = JSON.parse((await api("/api/config")).text);
+  assert.equal(c.language, "en");
+  assert.equal(c.locale["ui.cancel"], "Cancel");
+  const { language, bubbleLanguage, ...rest } = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  await writeFile(join(project, ".herdr-crew.json"), JSON.stringify(rest));
+});
+
+test("theme: a saved theme only reaches the page with flavour texts", async () => {
+  await writeConfig({ theme: { name: "keep", colors: { bg: "#000", ink: "#fff", panel: "#111" }, labels: { working: "busy", serverCheck: "x" }, texts: { "ui.serverCheck": "nothing" } } });
+  let c;
+  assert.ok(await until(async () => (c = JSON.parse((await api("/api/config")).text)).theme?.labels?.working === "busy"));
+  assert.deepEqual(c.theme.labels, { working: "busy" });
+  assert.equal(c.theme.texts, undefined);
+  await writeConfig({ theme: { name: "keep" } });
+});

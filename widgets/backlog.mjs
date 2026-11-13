@@ -1,15 +1,20 @@
 // Backlog widget: a read-only mini overview of Backlog.md tasks, from the task list the dashboard already follows
 // (`backlog task list --json --watch`). Rows open the task modal; the widget never changes a task.
 import { isObject, checkId, checkText, checkKeys, collect } from "../lib/widget-options.mjs";
+import { tr } from "../lib/i18n.mjs";
 
 const GROUPS = ["status", "priority", "assignee", "label", "none"];
 const FILTERS = ["status", "labels", "assignee", "priority"];
 const STATUS_ORDER = ["to do", "in progress", "done"];
 const PRIORITY_ORDER = ["high", "medium", "low"];
 
-const T = {
-  nl: { title: "Backlog", none: "Geen taken voor dit filter.", more: (n) => `en nog ${n}`, off: "Backlog.md staat uit voor dit project (backlog in .herdr-crew.json).", noPriority: "geen prioriteit", nobody: "niemand", noLabel: "geen label", all: "Alle taken" },
-  en: { title: "Backlog", none: "No tasks for this filter.", more: (n) => `and ${n} more`, off: "Backlog.md is off for this project (backlog in .herdr-crew.json).", noPriority: "no priority", nobody: "nobody", noLabel: "no label", all: "All tasks" },
+const T = (language) => {
+  const t = tr(language);
+  const k = (key) => t(`widget.backlog.${key}`);
+  return {
+    title: k("title"), none: k("none"), more: (n) => t("widget.backlog.more", { n }), off: k("off"),
+    noPriority: k("noPriority"), nobody: k("nobody"), noLabel: k("noLabel"), all: k("all"),
+  };
 };
 
 const list = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
@@ -49,7 +54,7 @@ const idNumber = (id) => Number(String(id).match(/(\d+)$/)?.[1] ?? Infinity);
 const byTask = (a, b) => at(PRIORITY_ORDER, a.priority) - at(PRIORITY_ORDER, b.priority)
   || (a.ordinal ?? Infinity) - (b.ordinal ?? Infinity) || idNumber(a.id) - idNumber(b.id) || String(a.id).localeCompare(String(b.id));
 
-export function overview(tasks, { filters = {}, groupBy = "status", limit = 20 } = {}, t = T.en) {
+export function overview(tasks, { filters = {}, groupBy = "status", limit = 20 } = {}, t = T("en")) {
   const hits = tasks.filter((x) => matches(x, filters)).sort(byTask);
   const keysOf = {
     status: (x) => [x.status || "?"],
@@ -88,7 +93,7 @@ export function overview(tasks, { filters = {}, groupBy = "status", limit = 20 }
 export default function create({ options, language, backlog }) {
   const errors = validate(options);
   if (errors.length) throw new Error(errors.join("; "));
-  const t = T[language] ?? T.en;
+  const t = T(language);
   const settings = { filters: options.filters ?? {}, groupBy: options.groupBy ?? "status", limit: options.limit ?? 20 };
   const filterText = Object.entries(settings.filters).map(([k, v]) => `${k}: ${list(v).join(", ")}`).join(" · ");
   return {

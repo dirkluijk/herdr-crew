@@ -59,6 +59,8 @@ It uses `ANTHROPIC_FOUNDRY_*` or `ANTHROPIC_API_KEY`.
 The task modal renders `backlog task view <id> --json` (schemaVersion 1) with a status pill, read only acceptance criteria checkboxes, sections, and clickable dependencies; it falls back to plain text for an unknown schemaVersion.
 `lib/widgets.mjs`: the widget set that hot reloads `widgets` entries (keep, create, dispose) and removes an entry for the remove button.
 `lib/project-file.mjs`: the real path rule for project files, shared by the links and markdown widgets.
+`lib/i18n.mjs`: locale files from `locales/` (`en.json` is the reference and fallback), `checkLocale` for keys, placeholders and empty texts, and the translator used by the server and the widgets.
+`locales/en.json`, `locales/nl.json`: every text of the page and the server.
 `lib/agents.mjs`: close and reopen of agents from the dashboard (Herdr tab close, tab create and agent start with the stored OpenCode session), with the cwd rule for the project and its git worktrees.
 `lib/panels.mjs`: the built-in panel types, entry validation for `widget add` and `widget remove`, and the message template that the Add panel button sends to the lead.
 `lib/widget-options.mjs`: shared option checks for the built-in widgets.

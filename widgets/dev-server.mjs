@@ -5,20 +5,20 @@ import { openSync, closeSync, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { isObject, checkId, checkText, checkPath, checkKeys, collect } from "../lib/widget-options.mjs";
+import { tr } from "../lib/i18n.mjs";
 
 const exec = (cmd, args, cwd, timeout = 10000) =>
   new Promise((res) => execFile(cmd, args, { cwd, timeout }, (err, stdout) => res(err ? "" : String(stdout).trim())));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const T = {
-  nl: { running: "draait op", stopped: "gestopt", starting: "starten…", stopping: "stoppen…", start: "▶ Start", stop: "■ Stop",
-    foreign: (p, c) => `Poort ${p} is bezet door een proces buiten ${c}; de widget laat dat met rust.`,
-    confirmStart: (c, cmd, p) => `Start ${cmd} in ${c} op poort ${p}.`, confirmStop: (c, p) => `Stopt het proces op poort ${p} in ${c}.`,
-    busy: (p) => `poort ${p} is al in gebruik`, timeout: "de server kwam niet op binnen de wachttijd", noDeps: "geen node_modules; de widget installeert niets" },
-  en: { running: "running on", stopped: "stopped", starting: "starting…", stopping: "stopping…", start: "▶ Start", stop: "■ Stop",
-    foreign: (p, c) => `Port ${p} belongs to a process outside ${c}; the widget leaves it alone.`,
-    confirmStart: (c, cmd, p) => `Runs ${cmd} in ${c} on port ${p}.`, confirmStop: (c, p) => `Stops the process on port ${p} in ${c}.`,
-    busy: (p) => `port ${p} is already in use`, timeout: "the server did not come up in time", noDeps: "no node_modules; the widget installs nothing" },
+const T = (language) => {
+  const t = tr(language);
+  const k = (key, p) => t(`widget.devServer.${key}`, p);
+  return {
+    running: k("running"), stopped: k("stopped"), starting: k("starting"), stopping: k("stopping"), start: k("start"), stop: k("stop"),
+    foreign: (port, cwd) => k("foreign", { port, cwd }), confirmStart: (cwd, command, port) => k("confirmStart", { cwd, command, port }),
+    confirmStop: (cwd, port) => k("confirmStop", { cwd, port }), busy: (port) => k("busy", { port }), timeout: k("timeout"), noDeps: k("noDeps"),
+  };
 };
 
 // Used by the CLI before it writes an entry; create itself stays as lenient as before.
@@ -37,7 +37,7 @@ export function validate(options) {
 }
 
 export default function create({ project, stateDir, options, language }) {
-  const t = T[language] ?? T.en;
+  const t = T(language);
   const id = options.id ?? `dev-${options.port}`;
   const cwd = resolve(project, options.cwd ?? ".");
   const shownCwd = options.cwd ?? ".";

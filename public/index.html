@@ -189,6 +189,8 @@
   dialog pre { white-space: pre-wrap; max-height: 50vh; overflow: auto; background: #0b0a12; color: #d8d4ee; padding: 0.8rem; border-radius: 10px; font-size: 0.78rem; }
   dialog textarea, dialog input[type=text] { width: 100%; font: inherit; padding: 0.6rem; border-radius: 10px; border: 1px solid #ffffff26; background: var(--bg); color: var(--ink); margin: 0.2rem 0 0.5rem; }
   dialog label { font-size: 0.85rem; color: var(--muted); }
+  .langs { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.6rem 0; }
+  .langs label { font-size: 0.95rem; color: var(--ink); }
   .row { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap; }
   .row button, .keys button { padding: 0.4rem 0.9rem; border-radius: 10px; border: 1px solid #ffffff26; background: #ffffff12; color: var(--ink); }
   .row button.primary { background: var(--idle); color: var(--bg); font-weight: 700; border: 0; }
@@ -238,7 +240,7 @@
 <header>
   <h1 id="title">Crew</h1>
   <div class="counts" id="counts"></div>
-  <div class="updated" id="updbox"><span id="updated">…</span><button id="layoutbtn"></button><button id="panelbtn"></button><button id="themebtn">🎨</button></div>
+  <div class="updated" id="updbox"><span id="updated">…</span><button id="layoutbtn"></button><button id="panelbtn"></button><button id="langbtn"></button><button id="themebtn">🎨</button></div>
 </header>
 <div class="tagline" id="tagline" style="padding: 0 2rem"></div>
 <div id="banner"></div>
@@ -257,89 +259,13 @@
 <div id="toast" role="status" aria-live="polite" hidden></div>
 <footer id="footer"></footer>
 <script>
-const I18N = {
-  nl: {
-    titleOf: (p) => `De crew van ${p}`, connecting: "verbinden…", warming: "opwarmen…", updated: (t) => `bijgewerkt ${t}`,
-    sections: { live: "Aan boord", closed: "Oud-collega's", widgets: "Widgets", new: "Nieuw aan boord" },
-    labels: { working: "aan het werk", idle: "wacht", done: "klaar", blocked: "heeft je nodig", closed: "gestopt", unknown: "onbekend", mascot: "mascotte" },
-    now: "net nu", min: (n) => `${n} min geleden`, hour: (n) => `${n} uur geleden`, day: (n) => `${n} d geleden`,
-    noWords: "Geen laatste woorden bewaard.", thinking: "denkt na", orchestrator: "👑 orchestrator", mascot: "🌰 mascotte", legend: "geen sessie, wel een legende",
-    newTag: "nieuw", unregistered: "niet geregistreerd", informed: (via) => `geïnformeerd${via === "orchestrator" ? " via de orchestrator" : ""}`,
-    by: { self: ["✍️ eigen woorden", "Door de agent zelf ingevuld"], stale: ["✍️ vorige beurt", "Eigen woorden van de vorige beurt"], screen: ["🖥 scherm", "Laatste schermregels, geen eigen wolkje"], summary: ["🤖 samengevat", "Samengevat door een model"], mascot: ["🌰 oneliner", "Wisselende oneliner"] },
-    noTerminal: "Pane staat vooraan in Herdr, maar de terminal komt niet naar voren: zet terminalApp in .herdr-crew.json (bijv. Alacritty).", openFailed: (n) => `terminalApp ${n} kon niet geopend worden; klopt de naam in .herdr-crew.json?`,
-    task: { description: "Beschrijving", implementationPlan: "Plan", implementationNotes: "Implementatienotities", finalSummary: "Samenvatting", ac: "Acceptatiecriteria", dod: "Definition of Done", deps: "Hangt af van", priority: "prioriteit" },
-    goTo: "↗ Ga naar", answer: "⚠ Beantwoord dialoog", inform: "👋 Informeer", register: "📝 Registreer",
-    chatPh: (n) => `Bericht aan ${n} (Enter verstuurt, Shift+Enter is nieuwe regel)`, chatBlocked: (n) => `${n} wacht op een dialoog, gebruik Beantwoord dialoog`, chatBusy: (n) => `${n} is aan het werk, even wachten…`,
-    sending: "versturen…", you: "Jij", viaDash: "via dashboard", context: "context", soon: "compaction nabij, handover nu", prep: "handover voorbereiden",
-    banner: (n, lead) => `${n} nieuwe agent${n === 1 ? "" : "s"} zonder persona of wolkje.${lead ? ` Onboarden is werk voor ${lead}.` : ""}`, bannerBtn: (lead) => lead ? `Vraag ${lead} om te onboarden` : "Informeer ze",
-    confirm: "Bevestig", cancel: "Annuleren", send: "Versturen", run: "Uitvoeren", close: "Sluiten", next: "Verder", clear: "Wissen", loading: "laden…",
-    to: (w, s) => `Naar <b>${w}</b>, status nu <b>${s}</b>.`, serverCheck: "De server controleert de status vlak voor het versturen nog een keer. Deze actie komt in .herdr-crew/actions.log.",
-    leadWarn: (n) => `Dit gaat naar de orchestrator. ${n} ziet het als een bericht van jou.`,
-    onboardTitle: (n, via, t) => via === "orchestrator" ? `${n} laten onboarden door ${t}` : `${n} informeren over de crew-conventies`,
-    registerTitle: (n) => `${n} registreren`, regHint: "Voegt de persona toe aan .herdr-crew.json. Hetzelfde kan met: herdr-crew register <agent> --name …",
-    name: "Naam", pronouns: "Voornaamwoorden", role: "Rol",
-    dialogTitle: (n) => `Dialoog van ${n} beantwoorden`, dialogHint: "Kies toetsen in volgorde, of typ een eigen antwoord. Je bevestigt daarna nog een keer.", ownAnswer: "Of: eigen antwoord als tekst (zonder Enter)",
-    keysLbl: "toetsen in dialoog", textLbl: "tekst in dialoog", log: "Log", hideLog: "Log verbergen", running: "draait",
-    removePanel: "Paneel verwijderen", remove: "Verwijderen",
-    closeBtn: "⏻ Sluiten", reopenBtn: "↻ Heropenen", closeTitle: (n) => `${n} sluiten`, reopenTitle: (n) => `${n} heropenen`, logNote: "Deze actie komt in .herdr-crew/actions.log.",
-    closeText: (a) => `Sluit de Herdr-tab van ${a.name} (${a.id}, ${a.pane}). OpenCode stopt, de sessie blijft bewaard. ${a.registered ? "Het dashboard onthoudt de sessie en de map, zodat je de agent later met Heropenen terugkrijgt." : "Deze agent staat niet in .herdr-crew.json, dus Heropenen kan daarna niet."} De server sluit alleen als ${a.name} wacht of klaar is en als enige in de tab staat.`,
-    reopenText: (a) => `Start de bewaarde OpenCode-sessie van ${a.name} opnieuw in een nieuwe tab ${a.label ?? `${a.id} (${a.name}${a.pronouns ? `, ${a.pronouns}` : ""})`}, als agent ${a.id}. Er gaat geen nieuwe briefing mee. Het kan tot een minuut duren.`,
-    closedToast: (n) => `${n} is gesloten.`, reopenedToast: (n) => `${n} is weer gestart in een nieuwe tab.`,
-    addPanel: "＋ Paneel", addPanelTitle: "Paneel toevoegen", panelPh: "Bijvoorbeeld: een mini-overzicht van alle open taken, of een link naar PLAN.md",
-    panelHint: (n) => `Beschrijf in gewone woorden welk paneel je wilt. ${n} maakt er een paneel van met een ingebouwd type (links, backlog, markdown of dev-server) en voegt het toe; er wordt geen HTML of code gemaakt. Je ziet het bericht nog voordat het verstuurd wordt.`,
-    panelNoLead: "Er staat geen lead persona in .herdr-crew.json (lead: true), dus er is niemand die het paneel kan maken.",
-    panelNotLive: (n) => `${n} draait nu niet in Herdr. Start de orchestrator en probeer het daarna opnieuw.`,
-    panelBusy: (n) => `${n} is nog bezig. Het bericht gaat alleen weg als ${n} wacht of klaar is en het invoerveld leeg is.`,
-    panelSent: (n) => `Verstuurd naar ${n}. Het nieuwe paneel verschijnt vanzelf zodra het is toegevoegd.`,
-    themeTitle: "Thema", themeHint: "Beschrijf een thema in vrije tekst. Alleen deze tekst en de projectnaam gaan naar het model, en voor avatars ook naam, rol en karakter van de persona's.",
-    themeNow: (n) => n ? `Huidig thema: <b>${n}</b>` : "Standaardthema", themeGen: "Genereer", themeReset: "Terug naar standaard", themeAvatars: "Avatars in dit thema", themeBusy: "thema genereren… (kan een halve minuut duren)",
-    noModel: "Geen modeltoegang op de server; het standaardthema blijft staan.",
-    pinnedSection: "Vastgepind", pin: "Vastpinnen", unpin: "Losmaken", up: "Naar voren", down: "Naar achteren", drag: "Sleep om te verplaatsen",
-    dropPin: "Sleep een kaartje hierheen om het vast te pinnen", resetLayout: "↺ Indeling", resetLayoutTitle: "Volgorde en pins terugzetten (alleen in deze browser)", resetConfirm: "Volgorde en pins van dit dashboard terugzetten?",
-    footer: "Leest Herdr (agents en schermen), OpenCode-sessiegeschiedenis en Backlog.md. ✍️ vult de agent zelf in, 🖥 zijn de laatste schermregels, 🤖 is een samenvatting. Knoppen doen alleen iets na jouw klik; alles komt in .herdr-crew/actions.log.",
-  },
-  en: {
-    titleOf: (p) => `The ${p} crew`, connecting: "connecting…", warming: "warming up…", updated: (t) => `updated ${t}`,
-    sections: { live: "On board", closed: "Former colleagues", widgets: "Widgets", new: "New on board" },
-    labels: { working: "working", idle: "waiting", done: "done", blocked: "needs you", closed: "stopped", unknown: "unknown", mascot: "mascot" },
-    now: "just now", min: (n) => `${n} min ago`, hour: (n) => `${n} h ago`, day: (n) => `${n} d ago`,
-    noWords: "No last words kept.", thinking: "thinking", orchestrator: "👑 orchestrator", mascot: "🌰 mascot", legend: "no session, still a legend",
-    newTag: "new", unregistered: "not registered", informed: (via) => `informed${via === "orchestrator" ? " via the orchestrator" : ""}`,
-    by: { self: ["✍️ own words", "Set by the agent itself"], stale: ["✍️ previous turn", "Own words from the previous turn"], screen: ["🖥 screen", "Last screen lines, no own bubble"], summary: ["🤖 summary", "Summarised by a model"], mascot: ["🌰 one-liner", "Rotating one-liner"] },
-    noTerminal: "Focused the pane in Herdr, but the terminal stays behind: set terminalApp in .herdr-crew.json (for example Alacritty).", openFailed: (n) => `Could not open terminalApp ${n}; is the name in .herdr-crew.json right?`,
-    task: { description: "Description", implementationPlan: "Plan", implementationNotes: "Implementation notes", finalSummary: "Final summary", ac: "Acceptance criteria", dod: "Definition of Done", deps: "Depends on", priority: "priority" },
-    goTo: "↗ Go to", answer: "⚠ Answer dialog", inform: "👋 Inform", register: "📝 Register",
-    chatPh: (n) => `Message to ${n} (Enter sends, Shift+Enter for a new line)`, chatBlocked: (n) => `${n} waits on a dialog, use Answer dialog`, chatBusy: (n) => `${n} is working, hold on…`,
-    sending: "sending…", you: "You", viaDash: "via dashboard", context: "context", soon: "compaction close, hand over now", prep: "prepare a handover",
-    banner: (n, lead) => `${n} new agent${n === 1 ? "" : "s"} without a persona or bubble.${lead ? ` Onboarding is ${lead}'s job.` : ""}`, bannerBtn: (lead) => lead ? `Ask ${lead} to onboard` : "Inform them",
-    confirm: "Confirm", cancel: "Cancel", send: "Send", run: "Run", close: "Close", next: "Next", clear: "Clear", loading: "loading…",
-    to: (w, s) => `To <b>${w}</b>, status now <b>${s}</b>.`, serverCheck: "The server checks the status again right before sending. This action goes into .herdr-crew/actions.log.",
-    leadWarn: (n) => `This goes to the orchestrator. ${n} sees it as a message from you.`,
-    onboardTitle: (n, via, t) => via === "orchestrator" ? `Ask ${t} to onboard ${n}` : `Tell ${n} the crew conventions`,
-    registerTitle: (n) => `Register ${n}`, regHint: "Adds the persona to .herdr-crew.json. Same as: herdr-crew register <agent> --name …",
-    name: "Name", pronouns: "Pronouns", role: "Role",
-    dialogTitle: (n) => `Answer ${n}'s dialog`, dialogHint: "Pick keys in order, or type your own answer. You confirm once more after this.", ownAnswer: "Or: your own answer as text (without Enter)",
-    keysLbl: "keys in dialog", textLbl: "text in dialog", log: "Log", hideLog: "Hide log", running: "running",
-    removePanel: "Remove panel", remove: "Remove",
-    closeBtn: "⏻ Close", reopenBtn: "↻ Reopen", closeTitle: (n) => `Close ${n}`, reopenTitle: (n) => `Reopen ${n}`, logNote: "This action goes into .herdr-crew/actions.log.",
-    closeText: (a) => `Closes the Herdr tab of ${a.name} (${a.id}, ${a.pane}). OpenCode stops, the session stays on disk. ${a.registered ? "The dashboard remembers the session and folder, so you can bring the agent back with Reopen." : "This agent is not in .herdr-crew.json, so it cannot be reopened afterwards."} The server only closes when ${a.name} is waiting or done and is the only pane in its tab.`,
-    reopenText: (a) => `Starts the stored OpenCode session of ${a.name} again in a new tab ${a.label ?? `${a.id} (${a.name}${a.pronouns ? `, ${a.pronouns}` : ""})`}, as agent ${a.id}. No new briefing is sent. This can take up to a minute.`,
-    closedToast: (n) => `${n} is closed.`, reopenedToast: (n) => `${n} started again in a new tab.`,
-    addPanel: "＋ Panel", addPanelTitle: "Add a panel", panelPh: "For example: a mini overview of all open tasks, or a link to PLAN.md",
-    panelHint: (n) => `Describe in plain words which panel you want. ${n} turns it into a panel of a built-in type (links, backlog, markdown or dev-server) and adds it; no HTML or code is generated. You see the message before it is sent.`,
-    panelNoLead: "There is no lead persona in .herdr-crew.json (lead: true), so nobody can make the panel.",
-    panelNotLive: (n) => `${n} is not running in Herdr right now. Start the orchestrator and try again.`,
-    panelBusy: (n) => `${n} is still busy. The message only goes out when ${n} is waiting or done and the input box is empty.`,
-    panelSent: (n) => `Sent to ${n}. The new panel shows up by itself once it is added.`,
-    themeTitle: "Theme", themeHint: "Describe a theme in free text. Only this text and the project name go to the model, plus persona name, role and traits for avatars.",
-    themeNow: (n) => n ? `Current theme: <b>${n}</b>` : "Default theme", themeGen: "Generate", themeReset: "Back to default", themeAvatars: "Avatars in this theme", themeBusy: "generating theme… (can take half a minute)",
-    noModel: "No model access on the server; the default theme stays.",
-    pinnedSection: "Pinned", pin: "Pin", unpin: "Unpin", up: "Move earlier", down: "Move later", drag: "Drag to move",
-    dropPin: "Drop a card here to pin it", resetLayout: "↺ Layout", resetLayoutTitle: "Reset order and pins (this browser only)", resetConfirm: "Reset the order and pins of this dashboard?",
-    footer: "Reads Herdr (agents and screens), OpenCode session history and Backlog.md. ✍️ is set by the agent, 🖥 are the last screen lines, 🤖 is a summary. Buttons only act on your click; everything goes into .herdr-crew/actions.log.",
-  },
-};
-let L = I18N.en;
+// Texts come from the locale the server sends with /api/config (locales/<language>.json, English as fallback).
+let LOC = {};
+const tx = (key, params = {}) => (LOC[key] ?? key).replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m));
+// The same, as HTML: the text is escaped and the values are shown in bold.
+// Escaped for HTML templates.
+const h = (key, params) => esc(tx(key, params));
+const tb = (key, params = {}) => esc(LOC[key] ?? key).replace(/\{(\w+)\}/g, (m, k) => (k in params ? `<b>${esc(params[k])}</b>` : m));
 let config = { theme: null, widgets: [] };
 const COLORS = { working: "--working", idle: "--idle", done: "--done", blocked: "--blocked", closed: "--closed", mascot: "--mascot" };
 const prev = {};
@@ -347,20 +273,20 @@ let current = { agents: [] };
 let last = 0;
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const label = (s) => config.theme?.labels?.[s] ?? L.labels[s] ?? s;
+const label = (s) => config.theme?.labels?.[s] ?? LOC[`ui.labels.${s}`] ?? s;
 function ago(iso) {
   if (!iso) return "";
   const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
-  if (s < 60) return L.now;
-  if (s < 3600) return L.min(Math.round(s / 60));
-  if (s < 86400) return L.hour(Math.round(s / 3600));
-  return L.day(Math.round(s / 86400));
+  if (s < 60) return tx("ui.now");
+  if (s < 3600) return tx("ui.min", { n: Math.round(s / 60) });
+  if (s < 86400) return tx("ui.hour", { n: Math.round(s / 3600) });
+  return tx("ui.day", { n: Math.round(s / 86400) });
 }
 
 const SHADOWS = { none: "none", soft: "0 10px 30px #00000040", hard: "6px 6px 0 #000000aa", glow: "0 0 24px color-mix(in srgb, var(--accent) 45%, transparent)" };
 function applyConfig(c) {
   config = c;
-  L = I18N[c.language] ?? I18N.en;
+  LOC = c.locale ?? {};
   document.documentElement.lang = c.language;
   const root = document.documentElement.style;
   for (const p of [...root]) if (p.startsWith("--")) root.removeProperty(p);
@@ -383,21 +309,27 @@ function applyConfig(c) {
     document.body.classList.add(`bg-${t.background}`, `av-${t.card.avatarShape}`);
     if (t.card.uppercase) document.body.classList.add("upper");
   }
-  const title = t?.title ? t.title.replaceAll("{project}", c.title) : L.titleOf(c.title);
+  const title = t?.title ? t.title.replaceAll("{project}", c.title) : tx("ui.titleOf", { project: c.title });
   document.getElementById("title").innerHTML = `<span>${esc(title)}</span>`;
   document.title = title;
   document.getElementById("tagline").textContent = t?.tagline ?? "";
-  for (const k of ["live", "closed"]) document.getElementById(`h-${k}`).textContent = t?.sections?.[k] ?? L.sections[k];
-  document.getElementById("h-widgets").textContent = c.widgets.length ? t?.sections?.widgets ?? L.sections.widgets : "";
-  document.getElementById("footer").textContent = L.footer;
+  for (const k of ["live", "closed"]) document.getElementById(`h-${k}`).textContent = t?.sections?.[k] ?? LOC[`ui.sections.${k}`];
+  document.getElementById("h-widgets").textContent = c.widgets.length ? t?.sections?.widgets ?? LOC["ui.sections.widgets"] : "";
+  document.getElementById("footer").textContent = tx("ui.footer");
+  const lb = document.getElementById("layoutbtn");
+  lb.textContent = tx("ui.resetLayout");
+  lb.title = tx("ui.resetLayoutTitle");
+  document.getElementById("panelbtn").textContent = tx("ui.addPanel");
+  const lang = document.getElementById("langbtn");
+  lang.textContent = `🌐 ${c.language.toUpperCase()}`;
+  lang.title = tx("ui.languageTitle");
   cardEls.clear();
   if (current.updatedAt) render(current);
 }
 
 function byTag(a) {
-  if (a.sayBy === "self") { const [l, tt] = a.stale ? L.by.stale : L.by.self; return `<span class="by ${a.stale ? "" : "self"}" title="${esc(tt)}">${l}</span>`; }
-  const b = L.by[a.sayBy];
-  return b ? `<span class="by" title="${esc(b[1])}">${b[0]}</span>` : "";
+  if (a.sayBy === "self") { const k = a.stale ? "stale" : "self"; return `<span class="by ${a.stale ? "" : "self"}" title="${esc(tx(`ui.by.${k}.title`))}">${esc(tx(`ui.by.${k}`))}</span>`; }
+  return LOC[`ui.by.${a.sayBy}`] ? `<span class="by" title="${esc(tx(`ui.by.${a.sayBy}.title`))}">${esc(tx(`ui.by.${a.sayBy}`))}</span>` : "";
 }
 
 function card(a) {
@@ -412,29 +344,29 @@ function card(a) {
   prev[a.id] = text;
   const bubble = text
     ? `<div class="bubble ${a.say ? "say" : ""} ${a.stale ? "stale" : ""} ${changed ? "flash" : ""}" title="${esc(a.detail || "")}">${a.headline ? `<span class="headline">${esc(a.headline)}</span>\n\n${esc(a.say || a.detail || "")}` : esc(text)}</div>`
-    : `<div class="bubble empty">${a.live ? "…" : esc(L.noWords)}</div>`;
+    : `<div class="bubble empty">${a.live ? "…" : esc(tx("ui.noWords"))}</div>`;
   const traits = (a.traits || []).map((t) => `<span class="trait">${esc(t)}</span>`).join("");
   const act = st === "working"
-    ? `<span class="act"><span class="dots"><span></span><span></span><span></span></span>${esc(a.activity || a.title || L.thinking)}</span>`
+    ? `<span class="act"><span class="dots"><span></span><span></span><span></span></span>${esc(a.activity || a.title || tx("ui.thinking"))}</span>`
     : `<span class="act">${esc(a.title || "")}</span>`;
   const tags = [
-    a.lead ? `<span class="crown">${L.orchestrator}</span>` : "",
-    a.mascot ? `<span class="crown">${L.mascot}</span>` : "",
-    a.isNew ? `<span class="tag">${esc(L.newTag)}</span>` : "",
-    a.live && !a.registered ? `<span class="tag" style="background:var(--done)">${esc(L.unregistered)}</span>` : "",
+    a.lead ? `<span class="crown">${h("ui.orchestrator")}</span>` : "",
+    a.mascot ? `<span class="crown">${h("ui.mascot")}</span>` : "",
+    a.isNew ? `<span class="tag">${esc(tx("ui.newTag"))}</span>` : "",
+    a.live && !a.registered ? `<span class="tag" style="background:var(--done)">${esc(tx("ui.unregistered"))}</span>` : "",
   ].join("");
   const pinned = layout.pinned.includes(a.id);
   const tools = a.lead ? "" : `<div class="tools">
-      <button class="handle" draggable="true" data-drag="${esc(a.id)}" title="${esc(L.drag)}" aria-label="${esc(L.drag)}">⠿</button>
-      <button data-move="-1" data-id="${esc(a.id)}" title="${esc(L.up)}" aria-label="${esc(L.up)}: ${esc(a.name)}">↑</button>
-      <button data-move="1" data-id="${esc(a.id)}" title="${esc(L.down)}" aria-label="${esc(L.down)}: ${esc(a.name)}">↓</button>
-      <button class="pin ${pinned ? "on" : ""}" data-pin="${esc(a.id)}" aria-pressed="${pinned}" title="${esc(pinned ? L.unpin : L.pin)}" aria-label="${esc(pinned ? L.unpin : L.pin)}: ${esc(a.name)}">📌</button>
+      <button class="handle" draggable="true" data-drag="${esc(a.id)}" title="${esc(tx("ui.drag"))}" aria-label="${esc(tx("ui.drag"))}">⠿</button>
+      <button data-move="-1" data-id="${esc(a.id)}" title="${esc(tx("ui.up"))}" aria-label="${esc(tx("ui.up"))}: ${esc(a.name)}">↑</button>
+      <button data-move="1" data-id="${esc(a.id)}" title="${esc(tx("ui.down"))}" aria-label="${esc(tx("ui.down"))}: ${esc(a.name)}">↓</button>
+      <button class="pin ${pinned ? "on" : ""}" data-pin="${esc(a.id)}" aria-pressed="${pinned}" title="${esc(pinned ? tx("ui.unpin") : tx("ui.pin"))}" aria-label="${esc(pinned ? tx("ui.unpin") : tx("ui.pin"))}: ${esc(a.name)}">📌</button>
     </div>`;
   return `<div class="card ${st} ${a.lead ? "lead" : ""} ${a.mascot ? "mascot" : ""} ${a.isNew ? "new" : ""}" data-card="${esc(a.id)}" style="--c:${color}">${tools}
     <div class="avatar">${pic}<span class="status">${esc(a.mascot && !a.live ? a.mascotStatus : label(st))}</span></div>
     <div>
       <div class="who"><span class="name">${esc(a.name)}</span><span class="pron">${esc(a.pronouns)}</span>${tags}</div>
-      <div class="agent">${a.mascot && !a.live ? esc(L.legend) : esc(a.id) + (a.pane ? " · " + esc(a.pane) : "")}${a.mascot && a.live ? ` · ${esc(a.mascotStatus)}` : ""}${a.informedAt ? ` · ${esc(L.informed(a.informedVia))}` : ""}</div>
+      <div class="agent">${a.mascot && !a.live ? esc(tx("ui.legend")) : esc(a.id) + (a.pane ? " · " + esc(a.pane) : "")}${a.mascot && a.live ? ` · ${esc(a.mascotStatus)}` : ""}${a.informedAt ? ` · ${esc(tx(a.informedVia === "orchestrator" ? "ui.informedViaOrchestrator" : "ui.informed"))}` : ""}</div>
       <div class="role">${esc(a.role)}</div>
       <div class="traits">${traits}</div>
       ${a.quirk ? `<div class="quirk">✨ ${esc(a.quirk)}</div>` : ""}
@@ -443,8 +375,8 @@ function card(a) {
     </div>
     <div class="conv">${conversation(a, bubble)}</div>
     ${a.live ? chatBox(a, st) : ""}
-    ${a.live ? actionsRow(a, st) : a.canReopen ? `<div class="actions"><button data-act="reopen" data-id="${esc(a.id)}">${L.reopenBtn}</button></div>` : ""}
-    <div class="meta">${act}<span>${byTag(a)}<span data-ago="${esc(a.since ?? "")}">${ago(a.since)}</span></span></div>
+    ${a.live ? actionsRow(a, st) : a.canReopen ? `<div class="actions"><button data-act="reopen" data-id="${esc(a.id)}">${h("ui.reopenBtn")}</button></div>` : ""}
+    <div class="meta">${act}<span>${byTag(a)}<span data-ago="${esc(a.since ?? "")}">${esc(ago(a.since))}</span></span></div>
   </div>`;
 }
 
@@ -453,16 +385,16 @@ function inBubble(a) {
   if (!m || !m.text) return "";
   const max = a.lead ? 500 : 220;
   const text = m.text.length > max ? m.text.slice(0, max) + "…" : m.text;
-  const mine = m.from === "Jij" || m.from === "You";
-  return `<div class="inbubble ${mine ? "me" : "other"}" title="${esc(m.text)}"><span class="from">${esc(mine ? L.you : m.from)}${m.via === "dashboard" ? ` · ${L.viaDash}` : ""} · <span data-ago="${esc(m.at ?? "")}">${ago(m.at)}</span></span>${esc(text)}</div>`;
+  const mine = m.from === tx("crew.you");
+  return `<div class="inbubble ${mine ? "me" : "other"}" title="${esc(m.text)}"><span class="from">${esc(mine ? tx("crew.you") : m.from)}${m.via === "dashboard" ? ` · ${h("ui.viaDash")}` : ""} · <span data-ago="${esc(m.at ?? "")}">${esc(ago(m.at))}</span></span>${esc(text)}</div>`;
 }
 
 function usageBar(u) {
   if (!u) return "";
   const level = u.pct >= 85 ? "high" : u.pct >= 70 ? "mid" : "low";
-  const hint = u.pct >= 85 ? L.soon : u.pct >= 70 ? L.prep : "";
+  const hint = u.pct >= 85 ? tx("ui.soon") : u.pct >= 70 ? tx("ui.prep") : "";
   return `<div class="usage ${level}" title="${u.tokensK}K tokens"><div class="bar"><span style="width:${Math.min(100, u.pct)}%"></span></div>
-    <span class="lbl">${L.context} ${u.pct}% · ${Math.round(u.tokensK)}K${hint ? ` · ${hint}` : ""}</span></div>`;
+    <span class="lbl">${h("ui.context")} ${u.pct}% · ${Math.round(u.tokensK)}K${hint ? ` · ${esc(hint)}` : ""}</span></div>`;
 }
 
 function conversation(a, bubble) {
@@ -475,7 +407,7 @@ const drafts = {};
 const chatNote = {};
 function chatBox(a, st) {
   const can = st === "idle" || st === "done";
-  const ph = can ? L.chatPh(a.name) : st === "blocked" ? L.chatBlocked(a.name) : L.chatBusy(a.name);
+  const ph = can ? tx("ui.chatPh", { name: a.name }) : st === "blocked" ? tx("ui.chatBlocked", { name: a.name }) : tx("ui.chatBusy", { name: a.name });
   return `<div class="chat"><textarea data-chat="${esc(a.id)}" rows="1" maxlength="4000" placeholder="${esc(ph)}" ${can ? "" : "disabled"}>${esc(drafts[a.id] ?? "")}</textarea>
     <div class="chat-note">${esc(chatNote[a.id] ?? "")}</div></div>`;
 }
@@ -487,7 +419,7 @@ async function sendChat(ta) {
   if (!text || sendingChat.has(id)) return;
   const a = agentById(id);
   const optimistic = () => {
-    pendingIn[id] = { sentAt: Date.now(), msg: { from: L.you, text, via: "dashboard", at: new Date().toISOString() } };
+    pendingIn[id] = { sentAt: Date.now(), msg: { from: tx("crew.you"), text, via: "dashboard", at: new Date().toISOString() } };
     drafts[id] = "";
     render(current);
   };
@@ -496,13 +428,13 @@ async function sendChat(ta) {
     else if (pendingIn[id]) { pendingIn[id].ok = true; chatNote[id] = ""; }
     render(current);
   };
-  if (config.confirmPrompt) return confirmStep(a, L.send, text, async () => {
+  if (config.confirmPrompt) return confirmStep(a, tx("ui.send"), text, async () => {
     await api(`api/agents/${encodeURIComponent(id)}/prompt`, { confirmed: true, text });
     optimistic();
     settle();
   });
   sendingChat.add(id);
-  chatNote[id] = L.sending;
+  chatNote[id] = tx("ui.sending");
   optimistic();
   try {
     await api(`api/agents/${encodeURIComponent(id)}/prompt`, { text });
@@ -528,11 +460,11 @@ document.addEventListener("keydown", (ev) => {
 function actionsRow(a, st) {
   const id = esc(a.id);
   return `<div class="actions">
-    <button data-act="focus" data-id="${id}">${L.goTo}</button>
-    ${!a.lead && !a.mascot && (a.isNew || !a.registered) ? `<button data-act="onboard" data-id="${id}" class="welcome">${L.inform}</button>` : ""}
-    ${!a.registered ? `<button data-act="register" data-id="${id}">${L.register}</button>` : ""}
-    ${st === "blocked" ? `<button data-act="answer" data-id="${id}" class="urgent">${L.answer}</button>` : ""}
-    ${!a.lead && (st === "idle" || st === "done") ? `<button data-act="close" data-id="${id}">${L.closeBtn}</button>` : ""}
+    <button data-act="focus" data-id="${id}">${h("ui.goTo")}</button>
+    ${!a.lead && !a.mascot && (a.isNew || !a.registered) ? `<button data-act="onboard" data-id="${id}" class="welcome">${h("ui.inform")}</button>` : ""}
+    ${!a.registered ? `<button data-act="register" data-id="${id}">${h("ui.register")}</button>` : ""}
+    ${st === "blocked" ? `<button data-act="answer" data-id="${id}" class="urgent">${h("ui.answer")}</button>` : ""}
+    ${!a.lead && (st === "idle" || st === "done") ? `<button data-act="close" data-id="${id}">${h("ui.closeBtn")}</button>` : ""}
   </div>`;
 }
 
@@ -593,7 +525,7 @@ function setHtml(id, html) {
 }
 function setUpdated(iso) {
   last = Date.now();
-  setText("updated", iso ? L.updated(new Date(iso).toLocaleTimeString(config.language === "nl" ? "nl-NL" : "en-GB")) : L.warming);
+  setText("updated", iso ? tx("ui.updated", { time: new Date(iso).toLocaleTimeString([config.language === "en" ? "en-GB" : config.language, "en-GB"]) }) : tx("ui.warming"));
 }
 
 // A chat message shows right away; the next snapshot with the message from the server takes over.
@@ -625,12 +557,12 @@ function render(snap) {
   place(document.getElementById("closed"), els(arrange(agents.filter((a) => !a.live && !a.lead && !a.mascot && !isPinned(a)))));
   const ids = new Set(agents.map((a) => a.id));
   for (const id of cardEls.keys()) if (!ids.has(id)) cardEls.delete(id);
-  setText("h-pinned", pinned.length ? L.pinnedSection : "");
-  document.getElementById("pinned").dataset.empty = L.dropPin;
-  setText("h-new", freshShown.length ? config.theme?.sections?.new ?? L.sections.new : "");
+  setText("h-pinned", pinned.length ? tx("ui.pinnedSection") : "");
+  document.getElementById("pinned").dataset.empty = tx("ui.dropPin");
+  setText("h-new", freshShown.length ? config.theme?.sections?.new ?? LOC["ui.sections.new"] : "");
   const leadName = config.onboardingVia === "orchestrator" ? config.lead : null;
   setHtml("banner", fresh.length && leadName
-    ? `<div class="banner"><span>${esc(L.banner(fresh.length, leadName))}</span><button data-onboard-all>${esc(L.bannerBtn(leadName))}</button></div>` : "");
+    ? `<div class="banner"><span>${esc(`${tx(fresh.length === 1 ? "ui.banner.one" : "ui.banner.many", { n: fresh.length })}${leadName ? ` ${tx("ui.banner.lead", { lead: leadName })}` : ""}`)}</span><button data-onboard-all>${esc((leadName ? tx("ui.bannerBtn.lead", { lead: leadName }) : tx("ui.bannerBtn.none")))}</button></div>` : "");
   for (const el of built) {
     el.querySelectorAll("textarea[data-chat]").forEach((ta) => { if (ta.value) ta.style.height = Math.min(ta.scrollHeight, 200) + "px"; });
   }
@@ -672,8 +604,8 @@ function showToast(text) {
 // The no-terminal hint shows once per page load; a failed open shows every time.
 let noTerminalShown = false;
 function focusHint(r) {
-  if (r.raised === false) showToast(L.openFailed(r.terminalApp));
-  else if (r.ok && r.terminalApp === null && !noTerminalShown) { noTerminalShown = true; showToast(L.noTerminal); }
+  if (r.raised === false) showToast(tx("ui.openFailed", { app: r.terminalApp }));
+  else if (r.ok && r.terminalApp === null && !noTerminalShown) { noTerminalShown = true; showToast(tx("ui.noTerminal")); }
 }
 
 const taskColor = (status) => {
@@ -684,7 +616,7 @@ const taskPill = (status) => status ? `<span class="tpill" style="--c:var(${task
 
 // Plain fields are escaped here; the markdown fields (html) are rendered and escaped by the server.
 function taskHtml(v) {
-  const T = L.task;
+  const T = new Proxy({}, { get: (_, k) => esc(tx(`ui.task.${String(k)}`)) });
   const checks = (title, items) => items.length ? `<h4>${title}</h4><ul class="checks">${items.map((c) =>
     `<li class="${c.checked ? "on" : ""}"><input type="checkbox" disabled ${c.checked ? "checked" : ""} aria-label="#${c.index}"><div class="md">${c.html}</div></li>`).join("")}</ul>` : "";
   const meta = [taskPill(v.status), v.priority ? `<span class="pill">${T.priority}: ${esc(v.priority)}</span>` : "",
@@ -699,34 +631,34 @@ function taskHtml(v) {
 let taskSeq = 0;
 async function openTask(id) {
   const seq = ++taskSeq;
-  showModal(`<h3>${esc(id)}</h3><pre>${L.loading}</pre><div class="row"><button data-close>${L.close}</button></div>`);
+  showModal(`<h3>${esc(id)}</h3><pre>${h("ui.loading")}</pre><div class="row"><button data-close>${h("ui.close")}</button></div>`);
   const pre = modal.querySelector("pre");
   let data;
   try { data = await api(`api/tasks/${encodeURIComponent(id)}`); } catch (e) { data = { text: e.message }; }
   // A newer task, another dialog or a closed modal wins over a slow answer.
   if (seq !== taskSeq || !modal.open || !pre.isConnected) return;
-  if (data.view) showModal(`<h3>${esc(data.view.id)} · ${esc(data.view.title)}</h3>${taskHtml(data.view)}<div class="row"><button data-close>${L.close}</button></div>`);
+  if (data.view) showModal(`<h3>${esc(data.view.id)} · ${esc(data.view.title)}</h3>${taskHtml(data.view)}<div class="row"><button data-close>${h("ui.close")}</button></div>`);
   else pre.textContent = data.text;
 }
 
 // A plain confirmation for actions on the agent itself, such as close and reopen.
 function confirmAction(title, text, button, fn) {
-  showModal(`<h3>${L.confirm}: ${esc(title)}</h3><p>${esc(text)}</p><p class="hint">${esc(L.logNote)}</p><div class="err"></div>
-    <div class="row"><button data-close>${L.cancel}</button><button class="danger" data-confirm>${esc(button)}</button></div>`);
+  showModal(`<h3>${h("ui.confirm")}: ${esc(title)}</h3><p>${esc(text)}</p><p class="hint">${esc(tx("ui.logNote"))}</p><div class="err"></div>
+    <div class="row"><button data-close>${h("ui.cancel")}</button><button class="danger" data-confirm>${esc(button)}</button></div>`);
   modal.querySelector("[data-confirm]").onclick = async (ev) => {
     ev.target.disabled = true;
-    modal.querySelector(".err").textContent = L.loading;
+    modal.querySelector(".err").textContent = tx("ui.loading");
     try { await fn(); modal.close(); } catch (e) { modal.querySelector(".err").textContent = e.message; ev.target.disabled = false; }
   };
 }
 
 // Shows the exact target and content; sends only on an explicit click.
 function confirmStep(a, title, shown, sendFn) {
-  showModal(`<h3>${L.confirm}: ${esc(title)}</h3>
-    <p>${L.to(esc(who(a)), esc(label(a.status)))}</p>
-    ${a.lead ? `<p class="warn">${esc(L.leadWarn(a.name))}</p>` : ""}
-    <pre>${esc(shown)}</pre><p class="hint">${L.serverCheck}</p><div class="err"></div>
-    <div class="row"><button data-close>${L.cancel}</button><button class="danger" data-confirm>${L.send}</button></div>`);
+  showModal(`<h3>${h("ui.confirm")}: ${esc(title)}</h3>
+    <p>${tb("ui.to", { who: who(a), status: label(a.status) })}</p>
+    ${a.lead ? `<p class="warn">${esc(tx("ui.leadWarn", { name: a.name }))}</p>` : ""}
+    <pre>${esc(shown)}</pre><p class="hint">${h("ui.serverCheck")}</p><div class="err"></div>
+    <div class="row"><button data-close>${h("ui.cancel")}</button><button class="danger" data-confirm>${h("ui.send")}</button></div>`);
   modal.querySelector("[data-confirm]").onclick = async (ev) => {
     ev.target.disabled = true;
     try { await sendFn(); modal.close(); } catch (e) { modal.querySelector(".err").textContent = e.message; ev.target.disabled = false; }
@@ -737,7 +669,7 @@ async function openOnboard(a) {
   try {
     const plan = await api(`api/agents/${encodeURIComponent(a.id)}/onboarding`);
     const target = agentById(plan.target) ?? a;
-    confirmStep(target, L.onboardTitle(a.name, plan.via, plan.targetName), plan.text, () => api(`api/agents/${encodeURIComponent(a.id)}/onboard`, { confirmed: true }));
+    confirmStep(target, (plan.via === "orchestrator" ? tx("ui.onboardTitle.orchestrator", { name: a.name, target: plan.targetName }) : tx("ui.onboardTitle.direct", { name: a.name })), plan.text, () => api(`api/agents/${encodeURIComponent(a.id)}/onboard`, { confirmed: true }));
   } catch (e) { alert(e.message); }
 }
 
@@ -746,18 +678,18 @@ async function openOnboardAll() {
     const plan = await api("api/crew/onboard");
     if (!plan.target) return;
     const target = agentById(plan.target);
-    confirmStep(target, L.bannerBtn(plan.targetName), plan.text, () => api("api/crew/onboard", { confirmed: true }));
+    confirmStep(target, (plan.targetName ? tx("ui.bannerBtn.lead", { lead: plan.targetName }) : tx("ui.bannerBtn.none")), plan.text, () => api("api/crew/onboard", { confirmed: true }));
   } catch (e) { alert(e.message); }
 }
 
 function openRegister(a) {
   const s = a.suggestion ?? {};
-  showModal(`<h3>${esc(L.registerTitle(a.id))}</h3>
-    <label>${L.name}</label><input type="text" name="name" maxlength="40" value="${esc(s.name ?? (a.name !== a.id ? a.name : ""))}">
-    <label>${L.pronouns}</label><input type="text" name="pronouns" maxlength="24" value="${esc(s.pronouns ?? a.pronouns ?? "")}">
-    <label>${L.role}</label><input type="text" name="role" maxlength="140" value="">
-    <p class="hint">${esc(L.regHint)}</p><div class="err"></div>
-    <div class="row"><button data-close>${L.cancel}</button><button class="primary" data-confirm>${L.register}</button></div>`);
+  showModal(`<h3>${esc(tx("ui.registerTitle", { name: a.id }))}</h3>
+    <label>${h("ui.name")}</label><input type="text" name="name" maxlength="40" value="${esc(s.name ?? (a.name !== a.id ? a.name : ""))}">
+    <label>${h("ui.pronouns")}</label><input type="text" name="pronouns" maxlength="24" value="${esc(s.pronouns ?? a.pronouns ?? "")}">
+    <label>${h("ui.role")}</label><input type="text" name="role" maxlength="140" value="">
+    <p class="hint">${esc(tx("ui.regHint"))}</p><div class="err"></div>
+    <div class="row"><button data-close>${h("ui.cancel")}</button><button class="primary" data-confirm>${h("ui.register")}</button></div>`);
   modal.querySelector("[data-confirm]").onclick = async (ev) => {
     const v = (n) => modal.querySelector(`[name=${n}]`).value;
     ev.target.disabled = true;
@@ -769,18 +701,18 @@ function openRegister(a) {
 const KEY_LABELS = { up: "↑", down: "↓", left: "←", right: "→", enter: "Enter", esc: "Esc", tab: "Tab", space: "Space" };
 async function openAnswer(a) {
   const keys = [];
-  showModal(`<h3>${esc(L.dialogTitle(a.name))}</h3><pre class="dlg">${L.loading}</pre><p class="hint">${L.dialogHint}</p>
+  showModal(`<h3>${esc(tx("ui.dialogTitle", { name: a.name }))}</h3><pre class="dlg">${h("ui.loading")}</pre><p class="hint">${h("ui.dialogHint")}</p>
     <div class="keys">${[...Object.keys(KEY_LABELS), "1", "2", "3", "4", "5", "6", "7", "8", "9"].map((k) => `<button data-key="${k}">${KEY_LABELS[k] ?? k}</button>`).join("")}</div>
-    <div class="seq"></div><input type="text" maxlength="4000" placeholder="${esc(L.ownAnswer)}">
-    <div class="row"><button data-close>${L.cancel}</button><button data-clear>${L.clear}</button><button class="primary" data-next>${L.next}</button></div>`);
+    <div class="seq"></div><input type="text" maxlength="4000" placeholder="${esc(tx("ui.ownAnswer"))}">
+    <div class="row"><button data-close>${h("ui.cancel")}</button><button data-clear>${h("ui.clear")}</button><button class="primary" data-next>${h("ui.next")}</button></div>`);
   const seq = modal.querySelector(".seq");
   modal.querySelectorAll("[data-key]").forEach((b) => (b.onclick = () => { if (keys.length < 10) keys.push(b.dataset.key); seq.textContent = keys.map((k) => KEY_LABELS[k] ?? k).join("  "); }));
   modal.querySelector("[data-clear]").onclick = () => { keys.length = 0; seq.textContent = ""; };
   modal.querySelector("[data-next]").onclick = () => {
     const text = modal.querySelector("input").value;
     const base = `api/agents/${encodeURIComponent(a.id)}`;
-    if (text.trim()) return confirmStep(a, L.textLbl, text, () => api(`${base}/type`, { confirmed: true, text }));
-    if (keys.length) return confirmStep(a, L.keysLbl, keys.map((k) => KEY_LABELS[k] ?? k).join("  "), () => api(`${base}/keys`, { confirmed: true, keys: [...keys] }));
+    if (text.trim()) return confirmStep(a, tx("ui.textLbl"), text, () => api(`${base}/type`, { confirmed: true, text }));
+    if (keys.length) return confirmStep(a, tx("ui.keysLbl"), keys.map((k) => KEY_LABELS[k] ?? k).join("  "), () => api(`${base}/keys`, { confirmed: true, keys: [...keys] }));
   };
   try { modal.querySelector(".dlg").textContent = (await api(`api/agents/${encodeURIComponent(a.id)}/screen`)).text.split("\n").slice(-30).join("\n"); }
   catch (e) { modal.querySelector(".dlg").textContent = e.message; }
@@ -788,23 +720,25 @@ async function openAnswer(a) {
 
 function openTheme() {
   const t = config.theme;
-  showModal(`<h3>${L.themeTitle}</h3><p>${L.themeNow(t ? esc(t.name) : "")}${t?.prompt ? ` <span class="hint">(${esc(t.prompt)})</span>` : ""}</p>
-    ${config.themeModel ? `<textarea name="prompt" maxlength="300" rows="2" placeholder="retro arcade · Hollands kantoor in de jaren negentig · space station">${esc(t?.prompt ?? "")}</textarea><p class="hint">${esc(L.themeHint)}</p>` : `<p class="warn">${esc(L.noModel)}</p>`}
+  showModal(`<h3>${h("ui.themeTitle")}</h3><p>${t ? tb("ui.themeNow", { name: t.name }) : esc(tx("ui.themeDefault"))}${t?.prompt ? ` <span class="hint">(${esc(t.prompt)})</span>` : ""}</p>
+    ${config.themeModel ? `<textarea name="prompt" maxlength="300" rows="2" placeholder="${esc(tx("ui.themePh"))}">${esc(t?.prompt ?? "")}</textarea><p class="hint">${esc(tx("ui.themeHint"))}</p>` : `<p class="warn">${esc(tx("ui.noModel"))}</p>`}
     <div class="err"></div>
-    <div class="row"><button data-close>${L.close}</button>
-      ${t ? `<button data-theme="reset">${L.themeReset}</button>` : ""}
-      ${t && config.themeAvatars ? `<button data-theme="avatars" ${config.avatarJob ? "disabled" : ""}>${L.themeAvatars}</button>` : ""}
-      ${config.themeModel ? `<button class="primary" data-theme="generate">${L.themeGen}</button>` : ""}</div>`);
+    <div class="row"><button data-close>${h("ui.close")}</button>
+      ${t ? `<button data-theme="reset">${h("ui.themeReset")}</button>` : ""}
+      ${t && config.themeAvatars ? `<button data-theme="avatars" ${config.avatarJob ? "disabled" : ""}>${h("ui.themeAvatars")}</button>` : ""}
+      ${config.themeModel ? `<button class="primary" data-theme="generate">${h("ui.themeGen")}</button>` : ""}</div>`);
   modal.querySelectorAll("[data-theme]").forEach((b) => (b.onclick = async () => {
     const kind = b.dataset.theme;
     const err = modal.querySelector(".err");
     modal.querySelectorAll("[data-theme]").forEach((x) => (x.disabled = true));
-    if (kind === "generate") err.textContent = L.themeBusy;
+    if (kind === "generate") err.textContent = tx("ui.themeBusy");
     try {
       const body = kind === "reset" ? { confirmed: true, reset: true } : kind === "avatars" ? { confirmed: true, avatars: true } : { confirmed: true, prompt: modal.querySelector("[name=prompt]").value };
-      await api("api/theme", body);
+      const r = await api("api/theme", body);
       applyConfig(await api("api/config"));
       modal.close();
+      const lang = r.language?.set ?? r.language?.missing;
+      if (lang) showToast(tx(r.language.set ? "ui.themeLanguageSet" : "ui.themeLanguageMissing", { language: languageLabel(lang) }));
     } catch (e) {
       err.textContent = e.message;
       modal.querySelectorAll("[data-theme]").forEach((x) => (x.disabled = false));
@@ -817,13 +751,13 @@ async function openAddPanel() {
   let info;
   try { info = await api("api/panels/request"); } catch (e) { return alert(e.message); }
   const name = info.leadName ?? "";
-  const problem = !info.lead ? L.panelNoLead : !info.live ? L.panelNotLive(name) : null;
-  showModal(`<h3>${esc(L.addPanelTitle)}</h3>
-    ${problem ? `<p class="warn">${esc(problem)}</p>` : `<p class="hint">${esc(L.panelHint(name))}</p>
-    <textarea name="panel" rows="3" maxlength="${Number(info.max) || 500}" placeholder="${esc(L.panelPh)}"></textarea>
-    ${info.status === "working" ? `<p class="warn">${esc(L.panelBusy(name))}</p>` : ""}`}
+  const problem = !info.lead ? tx("ui.panelNoLead") : !info.live ? tx("ui.panelNotLive", { name: name }) : null;
+  showModal(`<h3>${esc(tx("ui.addPanelTitle"))}</h3>
+    ${problem ? `<p class="warn">${esc(problem)}</p>` : `<p class="hint">${esc(tx("ui.panelHint", { name: name }))}</p>
+    <textarea name="panel" rows="3" maxlength="${Number(info.max) || 500}" placeholder="${esc(tx("ui.panelPh"))}"></textarea>
+    ${info.status === "working" ? `<p class="warn">${esc(tx("ui.panelBusy", { name: name }))}</p>` : ""}`}
     <div class="err"></div>
-    <div class="row"><button data-close>${L.cancel}</button>${problem ? "" : `<button class="primary" data-next>${L.next}</button>`}</div>`);
+    <div class="row"><button data-close>${h("ui.cancel")}</button>${problem ? "" : `<button class="primary" data-next>${h("ui.next")}</button>`}</div>`);
   const next = modal.querySelector("[data-next]");
   if (!next) return;
   modal.querySelector("textarea").focus();
@@ -833,15 +767,39 @@ async function openAddPanel() {
     try {
       const r = await api(`api/panels/request?prompt=${encodeURIComponent(prompt)}`);
       const target = agentById(r.lead);
-      if (!r.live || !target) throw new Error(L.panelNotLive(r.leadName ?? name));
-      confirmStep(target, L.addPanelTitle, r.text, async () => {
+      if (!r.live || !target) throw new Error(tx("ui.panelNotLive", { name: r.leadName ?? name }));
+      confirmStep(target, tx("ui.addPanelTitle"), r.text, async () => {
         await api("api/panels/request", { confirmed: true, prompt });
-        showToast(L.panelSent(target.name));
+        showToast(tx("ui.panelSent", { name: target.name }));
       });
     } catch (e) { modal.querySelector(".err").textContent = e.message; }
   };
 }
 document.getElementById("panelbtn").onclick = openAddPanel;
+
+const languageLabel = (code) => {
+  const l = (config.languages ?? []).find((x) => x.code === code);
+  if (l) return l.name;
+  try { return new Intl.DisplayNames([config.language, "en"], { type: "language" }).of(code) ?? code; } catch { return code; }
+};
+function openLanguage() {
+  const langs = config.languages ?? [];
+  showModal(`<h3>${h("ui.languageTitle")}</h3><p class="hint">${h("ui.languageHint")}</p>
+    <div class="langs">${langs.map((l) => `<label><input type="radio" name="lang" value="${esc(l.code)}" ${l.code === config.language ? "checked" : ""}> ${esc(l.name)} <span class="hint">${esc(l.code)}</span></label>`).join("")}</div>
+    <p class="hint">${h("ui.logNote")}</p><div class="err"></div>
+    <div class="row"><button data-close>${h("ui.cancel")}</button><button class="primary" data-confirm>${h("ui.languageSet")}</button></div>`);
+  modal.querySelector("[data-confirm]").onclick = async (ev) => {
+    const code = modal.querySelector("input[name=lang]:checked")?.value;
+    if (!code || code === config.language) return modal.close();
+    ev.target.disabled = true;
+    try {
+      await api("api/language", { confirmed: true, language: code });
+      applyConfig(await api("api/config"));
+      modal.close();
+    } catch (e) { modal.querySelector(".err").textContent = e.message; ev.target.disabled = false; }
+  };
+}
+document.getElementById("langbtn").onclick = openLanguage;
 
 document.addEventListener("click", async (ev) => {
   const t = ev.target.closest("button");
@@ -853,13 +811,13 @@ document.addEventListener("click", async (ev) => {
   if (!a) return;
   const act = t.dataset.act;
   if (act === "answer") return openAnswer(a);
-  if (act === "close") return confirmAction(L.closeTitle(a.name), L.closeText(a), L.closeBtn, async () => {
+  if (act === "close") return confirmAction(tx("ui.closeTitle", { name: a.name }), tx(a.registered ? "ui.closeText.registered" : "ui.closeText.unregistered", { name: a.name, id: a.id, pane: a.pane }), tx("ui.closeBtn"), async () => {
     await api(`api/agents/${encodeURIComponent(a.id)}/close`, { confirmed: true });
-    showToast(L.closedToast(a.name));
+    showToast(tx("ui.closedToast", { name: a.name }));
   });
-  if (act === "reopen") return confirmAction(L.reopenTitle(a.name), L.reopenText(a), L.reopenBtn, async () => {
+  if (act === "reopen") return confirmAction(tx("ui.reopenTitle", { name: a.name }), tx("ui.reopenText", { name: a.name, id: a.id, label: a.label ?? `${a.id} (${a.name}${a.pronouns ? `, ${a.pronouns}` : ""})` }), tx("ui.reopenBtn"), async () => {
     await api(`api/agents/${encodeURIComponent(a.id)}/reopen`, { confirmed: true });
-    showToast(L.reopenedToast(a.name));
+    showToast(tx("ui.reopenedToast", { name: a.name }));
   });
   if (act === "onboard") return openOnboard(a);
   if (act === "register") return openRegister(a);
@@ -881,7 +839,7 @@ document.addEventListener("click", (ev) => {
   const b = ev.target.closest("button[data-move], button[data-pin], #layoutbtn");
   if (!b) return;
   if (b.id === "layoutbtn") {
-    if (!confirm(L.resetConfirm)) return;
+    if (!confirm(tx("ui.resetConfirm"))) return;
     layout = { order: [], pinned: [] };
     saveLayout();
     return render(current);
@@ -977,23 +935,23 @@ let widgetViews = [];
 function widgetPanel(w) {
   return `<div class="widget">
     <div class="state">${w.list ? "" : `<span class="dot ${w.state}"></span>`}<b>${esc(w.title)}</b> ${w.list ? "" : `<span>${w.url ? `<a class="url" href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.text)}</a>` : esc(w.text ?? "")}</span>`}
-      <button class="wremove" data-widget="${esc(w.id)}" data-waction="remove" data-label="${esc(L.removePanel)}" title="${esc(L.removePanel)}" aria-label="${esc(L.removePanel)}: ${esc(w.title)}">✕</button></div>
+      <button class="wremove" data-widget="${esc(w.id)}" data-waction="remove" data-label="${esc(tx("ui.removePanel"))}" title="${esc(tx("ui.removePanel"))}" aria-label="${esc(tx("ui.removePanel"))}: ${esc(w.title)}">✕</button></div>
     ${w.list && w.text ? `<div class="hint">${esc(w.text)}</div>` : ""}
     ${(w.info ?? []).map((i) => `<div class="info">${esc(i)}</div>`).join("")}
     ${w.warning ? `<div class="warn">${esc(w.warning)}</div>` : ""}${w.error ? `<div class="err">${esc(w.error)}</div>` : ""}
     ${w.groups ? taskGroups(w) : ""}
     ${typeof w.html === "string" && w.html ? `<div class="md wmd" style="max-height:${Number(w.maxHeight) || 400}px">${w.html}</div>` : ""}
     <div class="btns">${(w.buttons ?? []).map((b) => `<button data-widget="${esc(w.id)}" data-waction="${esc(b.action)}" ${b.disabled ? "disabled" : ""}>${esc(b.label)}</button>`).join("")}
-      ${w.hasLog ? `<button data-widget="${esc(w.id)}" data-waction="log">${widgetLog[w.id] ? L.hideLog : L.log}</button>` : ""}</div>
+      ${w.hasLog ? `<button data-widget="${esc(w.id)}" data-waction="log">${h(widgetLog[w.id] ? "ui.hideLog" : "ui.log")}</button>` : ""}</div>
     ${(w.links ?? []).length && w.list ? `<ul class="linklist">${w.links.map((l) => `<li><a class="${l.enabled ? "" : "off"}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>${l.file ? ` <span class="info">${esc(l.file)}</span>` : ""}${l.note ? `<div class="hint">${esc(l.note)}</div>` : ""}</li>`).join("")}</ul>` : ""}
     ${(w.links ?? []).length && !w.list ? `<div class="links">${w.links.map((l) => `<a class="${l.enabled ? "" : "off"}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>`).join("")}</div>` : ""}
-    ${widgetLog[w.id] ? `<pre data-wlog="${esc(w.id)}">${L.loading}</pre>` : ""}
+    ${widgetLog[w.id] ? `<pre data-wlog="${esc(w.id)}">${h("ui.loading")}</pre>` : ""}
   </div>`;
 }
 // Keyed like the cards: a panel is only rebuilt when its view changed, so scroll and focus survive a poll.
 const widgetEls = new Map();
 function renderWidgets() {
-  setText("h-widgets", widgetViews.length ? config.theme?.sections?.widgets ?? L.sections.widgets : "");
+  setText("h-widgets", widgetViews.length ? config.theme?.sections?.widgets ?? LOC["ui.sections.widgets"] : "");
   const box = document.getElementById("widgets");
   const els = widgetViews.map((w) => {
     const key = `${JSON.stringify(w)}|${!!widgetLog[w.id]}|${config.language}`;
@@ -1012,7 +970,7 @@ function renderWidgets() {
   while (box.children.length > els.length) box.lastElementChild.remove();
   for (const w of widgetViews) if (widgetLog[w.id]) api(`api/widgets/${w.id}/log`).then((r) => {
     const pre = document.querySelector(`pre[data-wlog="${CSS.escape(w.id)}"]`);
-    if (pre) { pre.textContent = r.text || "(empty)"; pre.scrollTop = pre.scrollHeight; }
+    if (pre) { pre.textContent = r.text || tx("ui.empty"); pre.scrollTop = pre.scrollHeight; }
   }).catch(() => {});
 }
 async function pollWidgets() {
@@ -1027,8 +985,8 @@ document.addEventListener("click", async (ev) => {
   if (waction === "log") { widgetLog[widget] = !widgetLog[widget]; return renderWidgets(); }
   const w = widgetViews.find((x) => x.id === widget);
   const { confirm } = await api(`api/widgets/${widget}/${waction}`);
-  showModal(`<h3>${L.confirm}: ${esc(w.title)} · ${esc(b.dataset.label ?? b.textContent)}</h3><pre>${esc(confirm)}</pre><p class="hint">${L.serverCheck}</p><div class="err"></div>
-    <div class="row"><button data-close>${L.cancel}</button><button class="danger" data-confirm>${waction === "remove" ? L.remove : L.run}</button></div>`);
+  showModal(`<h3>${h("ui.confirm")}: ${esc(w.title)} · ${esc(b.dataset.label ?? b.textContent)}</h3><pre>${esc(confirm)}</pre><p class="hint">${h("ui.serverCheck")}</p><div class="err"></div>
+    <div class="row"><button data-close>${h("ui.cancel")}</button><button class="danger" data-confirm>${h(waction === "remove" ? "ui.remove" : "ui.run")}</button></div>`);
   modal.querySelector("[data-confirm]").onclick = async (e) => {
     e.target.disabled = true;
     try { await api(`api/widgets/${widget}/${waction}`, { confirmed: true }); modal.close(); widgetViews = await api("api/widgets"); renderWidgets(); }
@@ -1040,11 +998,7 @@ document.addEventListener("click", async (ev) => {
   applyConfig(await api("api/config"));
   layoutKey = `herdr-crew:layout:${config.layoutKey ?? location.port}`;
   loadLayout();
-  const lb = document.getElementById("layoutbtn");
-  lb.textContent = L.resetLayout;
-  lb.title = L.resetLayoutTitle;
-  document.getElementById("panelbtn").textContent = L.addPanel;
-  document.getElementById("updated").textContent = L.connecting;
+  document.getElementById("updated").textContent = tx("ui.connecting");
   pollWidgets();
   const es = new EventSource("events");
   es.onmessage = (e) => render(JSON.parse(e.data));

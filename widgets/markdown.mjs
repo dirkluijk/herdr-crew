@@ -5,12 +5,16 @@ import { statSync, readFileSync } from "node:fs";
 import { projectFile } from "../lib/project-file.mjs";
 import { renderMarkdown } from "../lib/markdown.mjs";
 import { isObject, checkId, checkText, checkPath, checkKeys, collect } from "../lib/widget-options.mjs";
+import { tr } from "../lib/i18n.mjs";
 
 const MAX_BYTES = 512 * 1024;
 
-const T = {
-  nl: { missing: (f) => `${f} bestaat niet`, outside: (f) => `${f} ligt buiten het project of is geen bestand`, big: (f) => `${f} is groter dan 512 kB`, noSection: (s) => `Sectie ${s} niet gevonden.`, full: "Hele bestand" },
-  en: { missing: (f) => `${f} does not exist`, outside: (f) => `${f} is outside the project or not a file`, big: (f) => `${f} is larger than 512 kB`, noSection: (s) => `Section ${s} not found.`, full: "Whole file" },
+const T = (language) => {
+  const t = tr(language);
+  return {
+    missing: (file) => t("widget.markdown.missing", { file }), outside: (file) => t("widget.markdown.outside", { file }),
+    big: (file) => t("widget.markdown.big", { file }), noSection: (section) => t("widget.markdown.noSection", { section }), full: t("widget.markdown.full"),
+  };
 };
 
 export function validate(options) {
@@ -41,7 +45,7 @@ export function section(src, name) {
 export default function create({ project, options, language, fileUrl }) {
   const errors = validate(options);
   if (errors.length) throw new Error(errors.join("; "));
-  const t = T[language] ?? T.en;
+  const t = T(language);
   const file = options.file;
   const id = options.id ?? "markdown";
   const files = {};

@@ -12,7 +12,8 @@ import { createCrew } from "./lib/crew.mjs";
 import { createActions, createGuard, send, readBody, exec } from "./lib/actions.mjs";
 import { promptWhenReady } from "./lib/send.mjs";
 import { createOnboarding, registerPersona } from "./lib/onboarding.mjs";
-import { generateTheme, generateAvatars, imageEndpoint } from "./lib/theme.mjs";
+import { generateTheme, generateAvatars, imageEndpoint, flavourTheme } from "./lib/theme.mjs";
+import { i18n, tr } from "./lib/i18n.mjs";
 import { modelEndpoint } from "./lib/summary.mjs";
 import { buildConfig } from "./lib/init.mjs";
 import { renderMarkdown, markdownPage } from "./lib/markdown.mjs";
@@ -163,20 +164,29 @@ const say = (s) => console.log(`[herdr-crew] ${s}`);
 async function askTheme() {
   if (!process.stdin.isTTY || args["no-prompt"]) return null;
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const nl = cfg.language === "nl";
-  const answer = await rl.question(nl
-    ? "Thema voor het dashboard? Vrije tekst, bijvoorbeeld 'retro arcade' of 'ruimtestation'. Enter = standaardthema: "
-    : "Dashboard theme? Free text, for example 'retro arcade' or 'space station'. Enter = default theme: ");
+  const answer = await rl.question(tr(cfg.language)("server.askTheme"));
   rl.close();
   return answer.trim() || null;
 }
 
 async function applyThemePrompt(prompt) {
   say(`generating theme: ${prompt}`);
-  const theme = await generateTheme({ prompt, language: cfg.language, project: cfg.title, model: args["theme-model"] ?? cfg.summaries.model });
+  const { theme, uiLanguage } = await generateTheme({ prompt, language: cfg.language, project: cfg.title, model: args["theme-model"] ?? cfg.summaries.model });
   await saveConfig(cfg, { theme, themeAsked: true });
   say(`theme saved in ${CONFIG_FILE}: ${theme.name}`);
-  return theme;
+  // A theme prompt such as "UI in English" may ask for a dashboard language; only an existing locale is applied.
+  let language = null;
+  if (uiLanguage && uiLanguage !== cfg.language) {
+    language = i18n.has(uiLanguage) ? { set: uiLanguage } : { missing: uiLanguage };
+    if (language.set) await setLanguage(uiLanguage);
+  }
+  return { theme, language };
+}
+
+// Writes the UI language. bubbleLanguage defaults to language, so pin it first: agents keep their bubble language.
+async function setLanguage(code) {
+  const raw = existsSync(cfg.file) ? JSON.parse(await readFile(cfg.file, "utf8")) : {};
+  await saveConfig(cfg, raw.bubbleLanguage ? { language: code } : { language: code, bubbleLanguage: cfg.bubbleLanguage });
 }
 
 if (args["reset-theme"]) {
@@ -267,9 +277,10 @@ const LAYOUT_KEY = `${typeof cfg.id === "string" && /^[\w.-]{1,64}$/.test(cfg.id
 
 function publicConfig() {
   return {
-    version: VERSION, title: cfg.title, layoutKey: LAYOUT_KEY, language: cfg.language, bubbleLanguage: cfg.bubbleLanguage, backlog: cfg.backlog,
+    version: VERSION, title: cfg.title, layoutKey: LAYOUT_KEY, bubbleLanguage: cfg.bubbleLanguage, backlog: cfg.backlog,
     lead: cfg.personas.find((p) => p.lead)?.name ?? null, onboardingVia: cfg.onboarding.via, confirmPrompt: !!cfg.confirm?.prompt,
-    theme: cfg.theme ?? null, themeModel: !!modelEndpoint(), themeAvatars: !!imageEndpoint(), avatarJob: !!avatarJob,
+    language: i18n.resolve(cfg.language), languageSetting: cfg.language, locale: i18n.dict(cfg.language), languages: i18n.languages(),
+    theme: flavourTheme(cfg.theme), themeModel: !!modelEndpoint(), themeAvatars: !!imageEndpoint(), avatarJob: !!avatarJob,
     widgets: widgets.list().map((w) => ({ id: w.id, title: w.title })),
   };
 }
@@ -314,6 +325,20 @@ async function handleWidgets(req, res, url) {
   return send(res, 202, { ok: true }), true;
 }
 
+async function handleLanguage(req, res, url) {
+  if (url.pathname !== "/api/language") return false;
+  if (req.method !== "POST") return send(res, 405, { error: "method not allowed" }), true;
+  if (!guard.originOk(req)) return send(res, 403, { error: "origin not allowed" }), true;
+  let body;
+  try { body = await readBody(req); } catch { return send(res, 400, { error: "bad body" }), true; }
+  if (body.confirmed !== true) return send(res, 400, { error: "not confirmed" }), true;
+  const code = typeof body.language === "string" ? body.language : "";
+  if (!i18n.has(code)) return send(res, 400, { error: "unknown language" }), true;
+  await setLanguage(code);
+  await actions.log("language", "set", { language: code, via: "dashboard" });
+  return send(res, 200, { ok: true, language: code }), true;
+}
+
 async function handleTheme(req, res, url) {
   if (url.pathname !== "/api/theme") return false;
   if (req.method !== "POST") return send(res, 405, { error: "method not allowed" }), true;
@@ -335,9 +360,10 @@ async function handleTheme(req, res, url) {
   if (!prompt) return send(res, 400, { error: "empty theme" }), true;
   if (!modelEndpoint()) return send(res, 409, { error: "no model credentials on the server" }), true;
   try {
-    const theme = await applyThemePrompt(prompt);
+    const { theme, language } = await applyThemePrompt(prompt);
     await actions.log("theme", "generate", prompt);
-    return send(res, 200, { theme }), true;
+    if (language?.set) await actions.log("language", "set", { language: language.set, via: "theme" });
+    return send(res, 200, { theme, language }), true;
   } catch (e) {
     return send(res, 502, { error: e.message }), true;
   }
@@ -352,7 +378,7 @@ createServer(async (req, res) => {
   }
   const url = new URL(req.url, "http://localhost");
   try {
-    const handled = await handleTheme(req, res, url) || await handleWidgets(req, res, url) || await actions.handle(req, res, url);
+    const handled = await handleLanguage(req, res, url) || await handleTheme(req, res, url) || await handleWidgets(req, res, url) || await actions.handle(req, res, url);
     // An action usually changes a status, so show it now instead of on the next tick.
     if (handled && req.method === "POST") poller.kick();
     if (handled) return;
