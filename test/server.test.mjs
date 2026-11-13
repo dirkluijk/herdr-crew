@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { request } from "node:http";
 import { createServer } from "node:net";
-import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, unlink } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, unlink, copyFile } from "node:fs/promises";
 import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, delimiter } from "node:path";
@@ -40,7 +40,7 @@ function http(port, path, { method = "GET", headers = {}, body, host = `localhos
   });
 }
 
-let root, project, port, filesPort, server, herdrLog;
+let root, project, port, filesPort, server, herdrLog, screenFile, stubEnv;
 const output = [];
 const ok = () => ({ origin: `http://localhost:${port}`, "x-crew": "1", "content-type": "application/json" });
 const api = (path, opts) => http(port, path, opts);
@@ -51,6 +51,7 @@ before(async () => {
   root = realpathSync(await mkdtemp(join(tmpdir(), "herdr-crew-http-")));
   project = join(root, "project");
   herdrLog = join(root, "herdr.log");
+  screenFile = join(root, "screen.ansi");
   await mkdir(join(project, "docs"), { recursive: true });
   await writeFile(join(project, "docs", "notes.md"), "# Notes\n\n<script>alert(1)</script>\n");
   await writeFile(join(project, "page.html"), "<h1>page</h1>");
@@ -85,8 +86,9 @@ before(async () => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(ANTHROPIC|OPENAI|HERDR)_|^PORT$/.test(k)));
   Object.assign(env, {
     PATH: [join(APP, "test", "fixtures", "bin"), process.env.PATH].join(delimiter),
-    HERDR_CREW_TEST_LOG: herdrLog, HERDR_CREW_TEST_PROJECT: project,
+    HERDR_CREW_TEST_LOG: herdrLog, HERDR_CREW_TEST_PROJECT: project, HERDR_CREW_TEST_SCREEN: screenFile,
   });
+  stubEnv = env;
   server = spawn(process.execPath, [join(APP, "server.mjs"), "--project", project, "--port", String(port), "--files-port", String(filesPort), "--no-prompt"], { env, stdio: ["ignore", "pipe", "pipe"] });
   server.stdout.on("data", (c) => output.push(String(c)));
   server.stderr.on("data", (c) => output.push(String(c)));
@@ -190,6 +192,50 @@ test("dashboard: a bad body gets 400", async () => {
 test("dashboard: no blocked prompts, keys or text reached herdr", async () => {
   const sent = (await herdrCalls()).filter((a) => ["prompt", "send-keys", "send-text", "focus", "zoom"].includes(a[1]));
   assert.deepEqual(sent, []);
+});
+
+const SCREENS = join(APP, "test", "fixtures", "screens");
+const prompts = async () => (await herdrCalls()).filter((a) => a[1] === "prompt");
+
+test("dashboard: a prompt waits for the draft in the input box", async () => {
+  const send = () => api("/api/agents/m9-probe/prompt", { method: "POST", headers: ok(), body: { text: "hello", confirmed: true } });
+  await rm(screenFile, { force: true });
+  let r = await send();
+  assert.equal(r.status, 409);
+  assert.match(r.text, /no input box visible/);
+  await copyFile(join(SCREENS, "session-draft.ansi"), screenFile);
+  r = await send();
+  assert.equal(r.status, 409);
+  assert.match(r.text, /draft in the input box/);
+  assert.deepEqual(await prompts(), []);
+  await copyFile(join(SCREENS, "session-empty.ansi"), screenFile);
+  r = await send();
+  assert.equal(r.status, 200);
+  assert.deepEqual(await prompts(), [["agent", "prompt", "w99:p1", "hello"]]);
+});
+
+function cli(...argv) {
+  return new Promise((res) => {
+    const p = spawn(process.execPath, [join(APP, "server.mjs"), "send", ...argv], { env: stubEnv, stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    p.stdout.on("data", (c) => (out += c));
+    p.stderr.on("data", (c) => (out += c));
+    p.on("exit", (code) => res({ code, out }));
+  });
+}
+
+test("send: times out on a draft with exit 2, sends to an empty box", async () => {
+  const before = (await prompts()).length;
+  await copyFile(join(SCREENS, "home-draft2.ansi"), screenFile);
+  let r = await cli("m9-probe", "[m3-skill]", "CREW-10: done.", "--timeout", "300", "--interval", "100");
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.out, /not sent: gave up after 0.3 s: m9-probe has a draft in the input box/);
+  assert.equal((await prompts()).length, before);
+  await copyFile(join(SCREENS, "home-empty.ansi"), screenFile);
+  r = await cli("m9-probe", "[m3-skill] CREW-10: done.", "--timeout", "300");
+  assert.equal(r.code, 0, r.out);
+  assert.deepEqual((await prompts()).at(-1), ["agent", "prompt", "m9-probe", "[m3-skill] CREW-10: done."]);
+  assert.equal((await cli("m9-probe")).code, 1);
 });
 
 test("dashboard: a confirmed widget action with the right headers runs", async () => {

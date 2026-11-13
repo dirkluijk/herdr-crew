@@ -9,7 +9,8 @@ import { createInterface } from "node:readline/promises";
 import { createHash } from "node:crypto";
 import { loadConfig, saveConfig, stateDir as makeStateDir, CONFIG_FILE } from "./lib/config.mjs";
 import { createCrew } from "./lib/crew.mjs";
-import { createActions, createGuard, send, readBody } from "./lib/actions.mjs";
+import { createActions, createGuard, send, readBody, exec } from "./lib/actions.mjs";
+import { promptWhenReady } from "./lib/send.mjs";
 import { createOnboarding, registerPersona } from "./lib/onboarding.mjs";
 import { generateTheme, generateAvatars, imageEndpoint } from "./lib/theme.mjs";
 import { modelEndpoint } from "./lib/summary.mjs";
@@ -39,13 +40,16 @@ Usage:
   herdr-crew [serve] [--project DIR] [--port N] [--theme ["free text"]] [--reset-theme] [--theme-avatars] [--no-prompt]
   herdr-crew init [--project DIR] [--plan PLAN.md] [--import personas.json] [--avatars DIR] [--language nl|en] [--port N] [--force]
   herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE] [--avatar KEY] [--project DIR]
+  herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
+      Waits until the agent is idle or done and its input box is empty, then sends the prompt.
+      Exit 0 sent, 2 timeout (default 100000 ms), 1 other errors.
 
 Config: <project>/${CONFIG_FILE}. State (memory, actions.log, theme avatars): <project>/.herdr-crew/.
 Model features (lead summary, prompted theme) use ANTHROPIC_FOUNDRY_* or ANTHROPIC_API_KEY;
 theme avatars use OPENAI_FOUNDRY_* or OPENAI_API_KEY. Without them everything degrades to defaults.`;
 
 const args = parseArgs(process.argv.slice(2));
-const command = ["init", "register", "serve", "help"].includes(args._[0]) ? args._.shift() : "serve";
+const command = ["init", "register", "send", "serve", "help"].includes(args._[0]) ? args._.shift() : "serve";
 const project = resolve(args.project ?? process.cwd());
 
 if (command === "help" || args.help) {
@@ -81,6 +85,24 @@ if (command === "register") {
   }
   console.log(`Registered ${p.agent} as ${p.name}${p.pronouns ? ` (${p.pronouns})` : ""} in ${join(project, CONFIG_FILE)}.`);
   process.exit(0);
+}
+
+if (command === "send") {
+  const [agent, ...words] = args._;
+  const text = words.join(" ").trim();
+  const ms = (v, d) => (v === undefined ? d : Number(v));
+  const timeout = ms(args.timeout, 100000);
+  const interval = ms(args.interval, 2000);
+  if (!agent || !text || !(timeout >= 0) || !(interval > 0)) {
+    console.error("Usage: herdr-crew send <agent> <text> [--timeout MS] [--interval MS]");
+    process.exit(1);
+  }
+  const r = await promptWhenReady((a) => exec("herdr", a, process.cwd(), 30000), agent, text, {
+    timeout, interval, onWait: (reason) => console.error(`[herdr-crew] ${reason}`),
+  });
+  if (r.ok) console.log(`Sent to ${agent}.`);
+  else console.error(`[herdr-crew] not sent: ${r.reason}`);
+  process.exit(r.ok ? 0 : r.timeout ? 2 : 1);
 }
 
 // serve
