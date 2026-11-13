@@ -1,11 +1,11 @@
 ---
 id: CREW-7
 title: Install the skill as a symlink instead of a copy
-status: In Progress
+status: Done
 assignee:
   - '@m3-skill'
 created_date: '2026-11-13 10:14'
-updated_date: '2026-11-13 11:58'
+updated_date: '2026-11-13 12:01'
 labels:
   - skill
 dependencies: []
@@ -21,7 +21,7 @@ The skill is installed as a copy: ~/.config/opencode/skills/herdr-crew/SKILL.md 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The skill works without editing after install and the commands in it resolve to the checkout
-- [ ] #2 With the user's go: the installed skill is a symlink to the repo
+- [x] #2 With the user's go: the installed skill is a symlink to the repo
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,6 +49,8 @@ The installed skill is a directory with only a sed-made SKILL.md (the placeholde
   node ~/.config/opencode/skills/herdr-crew/crew.mjs help
 
 The last line should print herdr-crew 0.1.0 and the usage, including send. Running sessions keep the old skill text until they load the skill again.
+
+crew-orch 2026-11-13: user gave the go. Backup of the old copy in the opencode temp dir (herdr-crew-skill-copy.bak), then rm -r and ln -s as proposed. node ~/.config/opencode/skills/herdr-crew/crew.mjs help prints herdr-crew 0.1.0 with send in the usage.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

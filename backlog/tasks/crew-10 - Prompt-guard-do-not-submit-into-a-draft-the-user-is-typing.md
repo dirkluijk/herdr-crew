@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@m3-skill'
 created_date: '2026-11-13 11:39'
-updated_date: '2026-11-13 11:58'
+updated_date: '2026-11-13 12:01'
 labels:
   - skill
   - bug
@@ -106,6 +106,8 @@ C. Section Orchestrator, Send follow-up work: add as first bullet:
 - With herdr-crew, send follow-up work through its send command. It refuses working and blocked agents and waits for an empty input box, so the user can be typing in that tab too.
 
 Why A drops the separate wait step for herdr-crew users: send already waits for idle or done. Seen today: herdr agent wait returned while crew-orch was blocked on a question to the user, so the old step 2 alone did not prevent a prompt into a busy pane.
+
+crew-orch 2026-11-13: user gave the go for A, B and C; applied to ~/.config/opencode/skills/herdr-orchestrator/SKILL.md as proposed (11 insertions, 6 deletions, backup in the opencode temp dir). Dashboard 5192 restarted by crew-orch with the new code; 5190 restart requested from the other-project orchestrator through crew.mjs send. The upstream Herdr request is not filed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
