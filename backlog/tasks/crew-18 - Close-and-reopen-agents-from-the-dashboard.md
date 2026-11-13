@@ -1,11 +1,11 @@
 ---
 id: CREW-18
 title: Close and reopen agents from the dashboard
-status: In Progress
+status: Done
 assignee:
   - '@m5-panels'
 created_date: '2026-11-13 13:19'
-updated_date: '2026-11-13 13:20'
+updated_date: '2026-11-13 13:29'
 labels:
   - ui
   - actions
@@ -22,12 +22,12 @@ User request 2026-11-13: close agents from the dashboard and reopen them later. 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Live non-lead cards that are idle or done have a Close button; after confirmation the agent tab closes, the session id is stored and the card turns closed
-- [ ] #2 Close is refused for working or blocked agents, the lead persona, and tabs with more than one pane
-- [ ] #3 Closed cards with a stored OpenCode session have a Reopen button that starts the same session in a new tab with the same label and agent name
-- [ ] #4 Reopen is refused when the agent name is live elsewhere or no valid session is stored
-- [ ] #5 Every close and reopen is confirmed and logged in actions.log; README documents both
-- [ ] #6 Tests cover the guards and the command sequence with stub herdr; npm test and npm run check pass
+- [x] #1 Live non-lead cards that are idle or done have a Close button; after confirmation the agent tab closes, the session id is stored and the card turns closed
+- [x] #2 Close is refused for working or blocked agents, the lead persona, and tabs with more than one pane
+- [x] #3 Closed cards with a stored OpenCode session have a Reopen button that starts the same session in a new tab with the same label and agent name
+- [x] #4 Reopen is refused when the agent name is live elsewhere or no valid session is stored
+- [x] #5 Every close and reopen is confirmed and logged in actions.log; README documents both
+- [x] #6 Tests cover the guards and the command sequence with stub herdr; npm test and npm run check pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -39,3 +39,22 @@ User request 2026-11-13: close agents from the dashboard and reopen them later. 
 4. Page: Close on live non-lead idle or done cards, Reopen on closed cards with a session, both through a confirm dialog.
 5. Stub herdr with a state file (status, pane count, start failure, extra live agents) and a stub opencode; tests for guards and command sequences. README.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented on feat/panels, commit e5db88d.
+- lib/agents.mjs: createAgentControl with a fixed herdr command map (agent get, agent list, tab get, tab close, tab create, agent start) through the existing execFile exec; pane and tab ids only from Herdr output (checked against [A-Za-z0-9_:-]). One close or reopen per agent at a time.
+- Close: lead refused; fresh herdr agent get must show the same pane and name and idle or done; herdr tab get pane_count must be 1; for a registered persona and agent kind opencode with a ses_ id, registerPersona stores session and cwd (validPersona now accepts both, optional, so old configs load); then herdr tab close. Unregistered or non-OpenCode agents can be closed but nothing is stored (confirm text says so).
+- Reopen: route only for agents that are not live in the snapshot; persona with a valid ses_ id; fresh herdr agent list must have no agent with that name anywhere; cwd rule (decision): stored cwd or the project, realpath must be an existing dir equal to or inside the project or a git worktree from git worktree list --porcelain (covers milestone worktrees like this one); crew workspace from the snapshot (workspace config, HERDR_WORKSPACE_ID, or most common); label = last tab label from memory, else <agent> (<Name>, <pronouns>); herdr tab create ... --no-focus, pane from .result.root_pane.pane_id, herdr agent start <agent> --kind opencode --pane <pane> --timeout 60000 -- --session <ses>; on a failed start the new tab is closed. No briefing.
+- Snapshot: closed cards get canReopen. Page: ⏻ Sluiten on live non-lead idle or done cards, ↻ Heropenen on closed cards with a session, both through a new confirm dialog; toast after success.
+- actions.log: close with tab, label, session, cwd; reopen with workspace, tab, pane, label, cwd, session.
+- Test stubs: herdr stub reads HERDR_CREW_TEST_STATE (status, panes, startFail, createNoPane, extraAgents) and answers tab get, tab create and agent get with session and cwd; new stub opencode so a stored session never reaches the real OpenCode.
+Validation: npm test 159/159 (twice), npm run check ok. test/agents.test.mjs: close sequence and stored fields, refusals (lead, working, blocked, other pane or name, 2 panes, unknown pane count, failed tab close), unregistered and non-OpenCode close, reopen sequence and label, fallback label and project cwd, refusals (no or bad session, unknown persona, name live elsewhere, list failure, cwd outside, symlink out, missing dir, no workspace), failed start closes the tab, missing pane id, one action at a time, allowedCwd with worktrees. server.test.mjs: route guards (403, 400), close refusals and success with stored session and log, lead refused, reopen refused for live and sessionless agents, success command sequence and log, failed start cleanup. Manual: own instance on 5277 with the stub herdr on PATH (no real Herdr calls), headless Chrome: Close and Reopen buttons on the right cards, both confirm dialogs, toasts, stub log shows tab close, tab create and agent start, actions.log lines and the stored session in the persona. No real agents were closed or started.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added Close for idle or done non-lead agents (closes the single-pane tab, stores session and cwd) and Reopen for closed personas with a stored OpenCode session (new tab with the same label and name, same session), with the guards from the task and a documented cwd rule (project, inside it, or a git worktree of it). Verified with npm test (159 pass), npm run check and a headless Chrome check on an own instance with stub herdr.
+<!-- SECTION:FINAL_SUMMARY:END -->
