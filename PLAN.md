@@ -36,9 +36,11 @@ It serves the page, `/events` with server-sent snapshot events, `/api/agents`, `
 It reloads `.herdr-crew.json` on change and runs a second listener for widget files.
 
 `lib/config.mjs`: config defaults, loading and saving `.herdr-crew.json`, and onboarding templates in Dutch and English.
-`lib/crew.mjs`: polls `herdr agent list`, `herdr tab list`, and `herdr agent read --source visible` for live agents every 4 seconds.
-It checks Backlog.md every 15 seconds and exports OpenCode sessions every 5 minutes for closed personas with a session id.
-It stores memory in `<project>/.herdr-crew/memory.json`.
+`lib/crew.mjs`: polls `herdr agent list`, `herdr tab list`, and `herdr agent read --source visible` for live agents, every second while a browser is connected and every 4 seconds otherwise, and right after every dashboard action.
+It follows Backlog.md through `backlog task list --json --watch` (polling every 15 seconds when `--watch` is not available) and exports OpenCode sessions every 5 minutes for closed personas with a session id.
+It stores memory in `<project>/.herdr-crew/memory.json`, written only when it changed.
+`lib/live.mjs`: the poll scheduler, the SSE hub that only sends a snapshot when its content changed (plus an `alive` heartbeat every 5 seconds), and the reader for the concatenated JSON of `--watch`.
+The page updates cards by key: only cards whose data changed are rebuilt, so hover, selection, scroll and drafts survive.
 Its snapshot includes status, the agent's own say-token bubble, screen fallback, last incoming message and sender, context use, new or unregistered agents, and mascots.
 `lib/screen.mjs`: ANSI stripping, secret redaction, and OpenCode screen parsing.
 `lib/actions.mjs`: Host and Origin checks, fixed Herdr command map through `execFile`, action endpoints, and `actions.log`.

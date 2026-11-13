@@ -16,6 +16,7 @@ import { generateTheme, generateAvatars, imageEndpoint } from "./lib/theme.mjs";
 import { modelEndpoint } from "./lib/summary.mjs";
 import { buildConfig } from "./lib/init.mjs";
 import { renderMarkdown, markdownPage } from "./lib/markdown.mjs";
+import { createHub, createScheduler } from "./lib/live.mjs";
 
 const APP = dirname(fileURLToPath(import.meta.url));
 const CLI = `node ${join(APP, "server.mjs")}`;
@@ -203,10 +204,12 @@ async function reloadConfig() {
   }
 }
 
-const clients = new Set();
-crew.onSnapshot((snap) => {
-  const payload = `data: ${JSON.stringify(snap)}\n\n`;
-  for (const res of clients) res.write(payload);
+// Herdr calls are a few ms each, so poll every second while a browser watches and every 4 s otherwise.
+const hub = createHub();
+crew.onSnapshot((snap) => hub.publish(snap));
+const poller = createScheduler({
+  run: async () => { await reloadConfig(); await crew.poll(); },
+  interval: () => (hub.size ? 1000 : 4000),
 });
 
 // Layout in the browser is stored per dashboard instance: project (id or real path) plus port.
@@ -283,9 +286,10 @@ createServer(async (req, res) => {
   }
   const url = new URL(req.url, "http://localhost");
   try {
-    if (await handleTheme(req, res, url)) return;
-    if (await handleWidgets(req, res, url)) return;
-    if (await actions.handle(req, res, url)) return;
+    const handled = await handleTheme(req, res, url) || await handleWidgets(req, res, url) || await actions.handle(req, res, url);
+    // An action usually changes a status, so show it now instead of on the next tick.
+    if (handled && req.method === "POST") poller.kick();
+    if (handled) return;
   } catch (e) {
     console.error(e);
     if (!res.headersSent) res.writeHead(500);
@@ -293,9 +297,9 @@ createServer(async (req, res) => {
   }
   if (url.pathname === "/events") {
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-    res.write(`data: ${JSON.stringify(crew.getSnapshot())}\n\n`);
-    clients.add(res);
-    req.on("close", () => clients.delete(res));
+    hub.add(res, crew.getSnapshot());
+    req.on("close", () => hub.delete(res));
+    poller.kick();
     return;
   }
   if (url.pathname === "/api/agents") return send(res, 200, crew.getSnapshot());
@@ -354,7 +358,15 @@ function loop(fn, ms) {
   const tick = async () => { try { await fn(); } catch (e) { console.error(e); } setTimeout(tick, ms); };
   tick();
 }
-loop(crew.pollBacklog, 15000);
+const stopBacklog = crew.watchBacklog({
+  onChange: () => poller.kick(),
+  onUnsupported: () => {
+    say("backlog task list --watch not available; polling Backlog.md every 15 s");
+    loop(crew.pollBacklog, 15000);
+  },
+});
+process.on("exit", stopBacklog);
+for (const sig of ["SIGINT", "SIGTERM"]) process.once(sig, () => process.exit(sig === "SIGINT" ? 130 : 143));
 loop(crew.pollHistory, 5 * 60 * 1000);
-loop(async () => { await reloadConfig(); await crew.poll(); }, 4000);
+poller.start();
 

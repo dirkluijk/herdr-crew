@@ -328,6 +328,58 @@ test("files origin: wrong Host 421, writes 405, cross-site fetches 403", async (
   assert.equal(head.text, "");
 });
 
+// Collects SSE frames from /events until stop() is called.
+function events() {
+  const frames = [];
+  let buf = "";
+  let req;
+  const opened = new Promise((res, rej) => {
+    req = request({ host: "127.0.0.1", port, path: "/events", headers: { host: `localhost:${port}` } }, (r) => {
+      r.setEncoding("utf8");
+      r.on("data", (c) => {
+        buf += c;
+        let at;
+        while ((at = buf.indexOf("\n\n")) >= 0) {
+          const raw = buf.slice(0, at);
+          buf = buf.slice(at + 2);
+          const event = raw.match(/^event: (.*)$/m)?.[1] ?? "message";
+          frames.push({ event, data: JSON.parse(raw.match(/^data: (.*)$/m)[1]), at: Date.now() });
+        }
+      });
+      res();
+    });
+    req.on("error", rej);
+    req.end();
+  });
+  return { frames, opened, stop: () => req.destroy() };
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const snapshots = (frames) => frames.filter((f) => f.event === "message");
+
+test("events: an unchanged snapshot is not sent again", async () => {
+  const sse = events();
+  await sse.opened;
+  // At least two fast polls (1 s while a browser watches) with the same Herdr state.
+  await sleep(2500);
+  sse.stop();
+  assert.equal(snapshots(sse.frames).length, 1);
+  assert.ok(sse.frames[0].data.agents.some((a) => a.id === "m9-probe" && a.live));
+});
+
+test("events: a dashboard action shows up without waiting for the next tick", async () => {
+  const sse = events();
+  await sse.opened;
+  await sleep(200);
+  const r = await api("/api/agents/m9-probe/prompt", { method: "POST", headers: ok(), body: { text: "hello snappy" } });
+  assert.equal(r.status, 200);
+  const until = Date.now() + 3000;
+  let frame;
+  while (!(frame = snapshots(sse.frames).find((f) => f.data.agents.find((a) => a.id === "m9-probe")?.lastIn?.text === "hello snappy")) && Date.now() < until) await sleep(20);
+  sse.stop();
+  assert.ok(frame, "no snapshot with the new message");
+  assert.equal(frame.data.agents.find((a) => a.id === "m9-probe").lastIn.via, "dashboard");
+});
+
 test("files origin: a listed file replaced by a symlink out of the project is refused", async () => {
   const target = join(project, "page.html");
   await unlink(target);

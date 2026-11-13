@@ -336,6 +336,7 @@ function applyConfig(c) {
   for (const k of ["live", "closed"]) document.getElementById(`h-${k}`).textContent = t?.sections?.[k] ?? L.sections[k];
   document.getElementById("h-widgets").textContent = c.widgets.length ? t?.sections?.widgets ?? L.sections.widgets : "";
   document.getElementById("footer").textContent = L.footer;
+  cardEls.clear();
   if (current.updatedAt) render(current);
 }
 
@@ -390,7 +391,7 @@ function card(a) {
     ${a.live ? chatBox(a, st) : ""}
     ${a.live ? actionsRow(a, st) : ""}
     ${a.live && openScreens.has(a.id) ? `<pre class="screen" data-screen="${esc(a.id)}">${esc(screens[a.id] ?? L.loading)}</pre>` : ""}
-    <div class="meta">${act}<span>${byTag(a)}${ago(a.since)}</span></div>
+    <div class="meta">${act}<span>${byTag(a)}<span data-ago="${esc(a.since ?? "")}">${ago(a.since)}</span></span></div>
   </div>`;
 }
 
@@ -400,7 +401,7 @@ function inBubble(a) {
   const max = a.lead ? 500 : 220;
   const text = m.text.length > max ? m.text.slice(0, max) + "…" : m.text;
   const mine = m.from === "Jij" || m.from === "You";
-  return `<div class="inbubble ${mine ? "me" : "other"}" title="${esc(m.text)}"><span class="from">${esc(mine ? L.you : m.from)}${m.via === "dashboard" ? ` · ${L.viaDash}` : ""} · ${ago(m.at)}</span>${esc(text)}</div>`;
+  return `<div class="inbubble ${mine ? "me" : "other"}" title="${esc(m.text)}"><span class="from">${esc(mine ? L.you : m.from)}${m.via === "dashboard" ? ` · ${L.viaDash}` : ""} · <span data-ago="${esc(m.at ?? "")}">${ago(m.at)}</span></span>${esc(text)}</div>`;
 }
 
 function usageBar(u) {
@@ -426,22 +427,35 @@ function chatBox(a, st) {
     <div class="chat-note">${esc(chatNote[a.id] ?? "")}</div></div>`;
 }
 
+const sendingChat = new Set();
 async function sendChat(ta) {
   const id = ta.dataset.chat;
   const text = ta.value.trim();
-  if (!text || ta.dataset.sending) return;
+  if (!text || sendingChat.has(id)) return;
   const a = agentById(id);
-  if (config.confirmPrompt) return confirmStep(a, L.send, text, async () => { await api(`api/agents/${encodeURIComponent(id)}/prompt`, { confirmed: true, text }); drafts[id] = ""; ta.value = ""; });
-  ta.dataset.sending = "1";
+  const optimistic = () => {
+    pendingIn[id] = { sentAt: Date.now(), msg: { from: L.you, text, via: "dashboard", at: new Date().toISOString() } };
+    drafts[id] = "";
+    render(current);
+  };
+  const settle = (err) => {
+    if (err) { delete pendingIn[id]; drafts[id] = text; chatNote[id] = err.message; }
+    else if (pendingIn[id]) { pendingIn[id].ok = true; chatNote[id] = ""; }
+    render(current);
+  };
+  if (config.confirmPrompt) return confirmStep(a, L.send, text, async () => {
+    await api(`api/agents/${encodeURIComponent(id)}/prompt`, { confirmed: true, text });
+    optimistic();
+    settle();
+  });
+  sendingChat.add(id);
   chatNote[id] = L.sending;
-  ta.nextElementSibling.textContent = chatNote[id];
+  optimistic();
   try {
     await api(`api/agents/${encodeURIComponent(id)}/prompt`, { text });
-    drafts[id] = ""; ta.value = ""; chatNote[id] = "";
-  } catch (e) { chatNote[id] = e.message; }
-  delete ta.dataset.sending;
-  const note = document.querySelector(`textarea[data-chat="${CSS.escape(id)}"] + .chat-note`);
-  if (note) note.textContent = chatNote[id];
+    settle();
+  } catch (e) { settle(e); }
+  sendingChat.delete(id);
 }
 
 document.addEventListener("input", (ev) => {
@@ -493,38 +507,96 @@ function setOrder(ids) {
 }
 const gridIds = (grid) => [...grid.querySelectorAll(":scope > [data-card]")].map((el) => el.dataset.card);
 
+// Keyed rendering: a card is only rebuilt when its data or its local state (pin, open screen, chat note)
+// changed, and only moved when its place changed. Untouched cards keep hover, selection, scroll and focus.
+const cardEls = new Map();
+const tpl = document.createElement("template");
+const cardKey = (a) => `${JSON.stringify(a)}|${layout.pinned.includes(a.id)}|${openScreens.has(a.id)}|${chatNote[a.id] ?? ""}`;
+function cardEl(a, built) {
+  const key = cardKey(a);
+  const old = cardEls.get(a.id);
+  if (old?.key === key) return old.el;
+  tpl.innerHTML = card(a).trim();
+  const el = tpl.content.firstElementChild;
+  // Reusing the decoded avatar avoids a blink while the browser swaps the image.
+  const oldImg = old?.el.querySelector(".avatar img");
+  const newImg = el.querySelector(".avatar img");
+  if (oldImg && newImg && oldImg.getAttribute("src") === newImg.getAttribute("src")) newImg.replaceWith(oldImg);
+  if (old?.el.isConnected) old.el.replaceWith(el);
+  cardEls.set(a.id, { key, el });
+  built.push(el);
+  return el;
+}
+function place(container, els) {
+  els.forEach((el, i) => { if (container.children[i] !== el) container.insertBefore(el, container.children[i] ?? null); });
+  while (container.children.length > els.length) container.lastElementChild.remove();
+}
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el.textContent !== text) el.textContent = text;
+}
+function setHtml(id, html) {
+  const el = document.getElementById(id);
+  if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+}
+function setUpdated(iso) {
+  last = Date.now();
+  setText("updated", iso ? L.updated(new Date(iso).toLocaleTimeString(config.language === "nl" ? "nl-NL" : "en-GB")) : L.warming);
+}
+
+// A chat message shows right away; the next snapshot with the message from the server takes over.
+const pendingIn = {};
+function withPending(a) {
+  const p = pendingIn[a.id];
+  if (!p) return a;
+  const arrived = a.lastIn?.via === "dashboard" && Date.parse(a.lastIn.at) >= p.sentAt - 2000;
+  if ((p.ok && arrived) || Date.now() - p.sentAt > 15000) { delete pendingIn[a.id]; return a; }
+  return { ...a, lastIn: p.msg };
+}
+
 function render(snap) {
   if (dragging) { pendingSnap = snap; return; }
-  last = Date.now();
   const active = document.activeElement?.dataset?.chat ? document.activeElement : null;
   const focus = active && { id: active.dataset.chat, start: active.selectionStart, end: active.selectionEnd };
   current = snap;
-  const agents = snap.agents;
+  const agents = snap.agents.map(withPending);
   const isPinned = (a) => !a.lead && layout.pinned.includes(a.id);
   const pinned = layout.pinned.map((id) => agents.find((a) => a.id === id && !a.lead)).filter(Boolean);
   const fresh = agents.filter((a) => a.live && a.isNew);
-  document.getElementById("lead").innerHTML = agents.filter((a) => a.lead).map(card).join("");
-  document.getElementById("h-pinned").textContent = pinned.length ? L.pinnedSection : "";
-  document.getElementById("pinned").innerHTML = pinned.map(card).join("");
-  document.getElementById("pinned").dataset.empty = L.dropPin;
   const freshShown = arrange(fresh.filter((a) => !isPinned(a)));
-  document.getElementById("h-new").textContent = freshShown.length ? config.theme?.sections?.new ?? L.sections.new : "";
-  document.getElementById("new").innerHTML = freshShown.map(card).join("");
-  document.getElementById("live").innerHTML = arrange(agents.filter((a) => !a.lead && !a.isNew && (a.live || a.mascot) && !isPinned(a))).map(card).join("");
-  document.getElementById("closed").innerHTML = arrange(agents.filter((a) => !a.live && !a.lead && !a.mascot && !isPinned(a))).map(card).join("");
+  const built = [];
+  const els = (list) => list.map((a) => cardEl(a, built));
+  place(document.getElementById("lead"), els(agents.filter((a) => a.lead)));
+  place(document.getElementById("pinned"), els(pinned));
+  place(document.getElementById("new"), els(freshShown));
+  place(document.getElementById("live"), els(arrange(agents.filter((a) => !a.lead && !a.isNew && (a.live || a.mascot) && !isPinned(a)))));
+  place(document.getElementById("closed"), els(arrange(agents.filter((a) => !a.live && !a.lead && !a.mascot && !isPinned(a)))));
+  const ids = new Set(agents.map((a) => a.id));
+  for (const id of cardEls.keys()) if (!ids.has(id)) cardEls.delete(id);
+  setText("h-pinned", pinned.length ? L.pinnedSection : "");
+  document.getElementById("pinned").dataset.empty = L.dropPin;
+  setText("h-new", freshShown.length ? config.theme?.sections?.new ?? L.sections.new : "");
   const leadName = config.onboardingVia === "orchestrator" ? config.lead : null;
-  document.getElementById("banner").innerHTML = fresh.length && leadName
-    ? `<div class="banner"><span>${esc(L.banner(fresh.length, leadName))}</span><button data-onboard-all>${esc(L.bannerBtn(leadName))}</button></div>` : "";
-  document.querySelectorAll("pre[data-screen]").forEach((el) => (el.scrollTop = el.scrollHeight));
-  document.querySelectorAll("textarea[data-chat]").forEach((ta) => { if (ta.value) ta.style.height = Math.min(ta.scrollHeight, 200) + "px"; });
+  setHtml("banner", fresh.length && leadName
+    ? `<div class="banner"><span>${esc(L.banner(fresh.length, leadName))}</span><button data-onboard-all>${esc(L.bannerBtn(leadName))}</button></div>` : "");
+  for (const el of built) {
+    el.querySelectorAll("pre[data-screen]").forEach((pre) => (pre.scrollTop = pre.scrollHeight));
+    el.querySelectorAll("textarea[data-chat]").forEach((ta) => { if (ta.value) ta.style.height = Math.min(ta.scrollHeight, 200) + "px"; });
+  }
   if (focus) {
     const ta = document.querySelector(`textarea[data-chat="${CSS.escape(focus.id)}"]`);
-    if (ta && !ta.disabled) { ta.focus(); ta.setSelectionRange(focus.start, focus.end); }
+    if (ta && !ta.disabled && document.activeElement !== ta) { ta.focus(); ta.setSelectionRange(focus.start, focus.end); }
   }
   const n = (s) => agents.filter((a) => a.status === s).length;
-  document.getElementById("counts").innerHTML = ["working", "idle", "done", "blocked", "closed"].map((s) => `<span class="pill"><b>${n(s)}</b> ${esc(label(s))}</span>`).join("");
-  document.getElementById("updated").textContent = snap.updatedAt ? L.updated(new Date(snap.updatedAt).toLocaleTimeString(config.language === "nl" ? "nl-NL" : "en-GB")) : L.warming;
+  setHtml("counts", ["working", "idle", "done", "blocked", "closed"].map((s) => `<span class="pill"><b>${n(s)}</b> ${esc(label(s))}</span>`).join(""));
+  setUpdated(snap.updatedAt);
 }
+
+// Relative times ("2 min ago") tick on their own, so a quiet card does not need a rebuild.
+setInterval(() => document.querySelectorAll("[data-ago]").forEach((el) => {
+  const t = ago(el.dataset.ago);
+  if (el.textContent !== t) el.textContent = t;
+}), 15000);
 
 async function api(path, body) {
   const res = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json", "x-crew": "1" }, body: JSON.stringify(body) });
@@ -762,6 +834,7 @@ document.addEventListener("drop", (ev) => {
 document.addEventListener("dragend", () => {
   dragging = null;
   clearDropMarks();
+  document.querySelectorAll(".card.dragging").forEach((el) => el.classList.remove("dragging"));
   document.body.classList.remove("dragging");
   render(pendingSnap ?? current);
   pendingSnap = null;
@@ -823,6 +896,8 @@ document.addEventListener("click", async (ev) => {
   pollWidgets();
   const es = new EventSource("events");
   es.onmessage = (e) => render(JSON.parse(e.data));
+  // The server only sends a snapshot when something changed; this heartbeat says it is still polling.
+  es.addEventListener("alive", (e) => setUpdated(JSON.parse(e.data).updatedAt));
   // Picks up theme or language changes made from the CLI or another tab.
   setInterval(async () => {
     const c = await api("api/config").catch(() => null);
