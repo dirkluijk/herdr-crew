@@ -65,8 +65,20 @@ When the project has a `.herdr-crew.json`, add these steps to the usual start of
    node /path/to/herdr-crew/server.mjs register <agent> --project "$PWD" --name NAME --pronouns P --role ROLE
    ```
 
-2. Label the tab `<agent> (<Name>, <pronouns>)` and name the Herdr agent `<agent>`.
-3. Put the crew line in the briefing (see below).
+2. Make the portrait and add it to the persona (see Avatars).
+3. Label the tab `<agent> (<Name>, <pronouns>)` and name the Herdr agent `<agent>`.
+4. Put the crew line in the briefing (see below).
+
+### Avatars
+
+The orchestrator makes the portrait of every new persona while registering it. When the orchestrator is busy, it asks the new agent to make its own portrait during onboarding, with the same rules.
+
+- Location: `<avatarDir>/<first-name>.png`, with `avatarDir` from `.herdr-crew.json` and the first name in lowercase (`sjaak.png`). Without an `avatarDir`, ask the user where avatars go before you set one.
+- Format: square PNG, 384 by 384 pixels. Resize a larger result, for example with `sips -Z 384 <file>` on macOS.
+- Style: match the existing set and pass two or three of its files as reference images. Without references, use: warm flat digital illustration, head and shoulders, friendly face, a solid pastel circle behind the person on a white background, holding one object that fits the role or quirk, no text or logos.
+- Content: only name, pronouns, role, traits and quirk go into the image prompt. No screens, tasks, messages or project secrets.
+- Then link it: `register <agent> --project "$PWD" --avatar <first-name>` (the other fields stay as they are). The dashboard picks it up within a few seconds.
+- Do not overwrite an existing avatar of another persona; pick a different key when the first name is taken.
 
 Include one line in every briefing pointing to this skill. If the agent does not have it, give the bubble command and language instead. For example:
 
