@@ -60,8 +60,13 @@ test("invalid personas are refused and leave the file untouched", async () => {
   assert.equal(await readFile(file, "utf8"), before);
 });
 
-test("an agent name longer than 32 characters is refused, not cut", { todo: "bug: it is cut to 32 characters and registered under a name Herdr never uses (see CREW-8 notes)" }, async () => {
+test("an agent name longer than 32 characters is refused, not cut", async () => {
+  const before = await readFile(file, "utf8");
   assert.equal(await registerPersona(file, { agent: "a".repeat(33), name: "X" }), null);
+  assert.equal(await readFile(file, "utf8"), before);
+  assert.equal(validPersona({ agent: "a".repeat(32), name: "X" }).agent, "a".repeat(32));
+  assert.equal(validPersona({ agent: " m2-tests ", name: "X" }).agent, "m2-tests");
+  assert.equal(validPersona({ agent: "m2\u0007tests", name: "X" }), null);
 });
 
 test("validPersona strips control characters and angle brackets, and drops bad avatar keys", () => {

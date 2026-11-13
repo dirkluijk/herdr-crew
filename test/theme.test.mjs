@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { validateTheme } from "../lib/theme.mjs";
+import { loadConfig } from "../lib/config.mjs";
 
 const base = () => ({ name: "Night", colors: { bg: "#000", ink: "#ffffff", panel: "#11223344" } });
 
@@ -25,10 +29,21 @@ test("keeps valid hex colours and drops bad ones", () => {
   assert.deepEqual(v.colors, { bg: "#000", ink: "#ffffff", panel: "#11223344", accent: "#AbC", unknown: "#abcdef" });
 });
 
-test("colours follow the CSS hex lengths 3, 4, 6 and 8", { todo: "bug: #12345 is accepted and #1234 is refused (see CREW-8 notes)" }, () => {
+test("colours follow the CSS hex lengths 3, 4, 6 and 8", () => {
   const keep = (c) => validateTheme({ ...base(), colors: { ...base().colors, accent: c } }, "x").colors.accent;
-  assert.equal(keep("#12345"), undefined);
-  assert.equal(keep("#1234"), "#1234");
+  for (const c of ["#abc", "#abcd", "#aabbcc", "#aabbccdd"]) assert.equal(keep(c), c);
+  for (const c of ["#ab", "#12345", "#1234567", "#123456789", "#"]) assert.equal(keep(c), undefined, c);
+});
+
+test("a saved theme with an old 5 digit colour still loads", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "herdr-crew-theme-"));
+  try {
+    const theme = { name: "old", colors: { bg: "#000", ink: "#fff", panel: "#111", accent: "#12345" } };
+    await writeFile(join(dir, ".herdr-crew.json"), JSON.stringify({ theme }));
+    assert.deepEqual((await loadConfig(dir)).theme, theme);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("a required colour that is invalid rejects the theme", () => {

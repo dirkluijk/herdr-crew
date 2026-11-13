@@ -82,8 +82,16 @@ test("inline emphasis and code", () => {
   assert.equal(html("snake_case_name"), "<p>snake_case_name</p>");
 });
 
-test("emphasis markers inside a link URL leave the href intact", { todo: "bug: _x_ or *x* in a URL becomes <em> inside the href (see CREW-8 notes)" }, () => {
+test("emphasis markers inside a link URL leave the href intact", () => {
   assert.match(html("[a](https://example.com/_x_/y)"), /href="https:\/\/example.com\/_x_\/y"/);
+  assert.match(html("[a](https://example.com/*x*/y)"), /href="https:\/\/example.com\/\*x\*\/y"/);
+  assert.match(html("[a](docs/_x_.md)"), /<span class="ref">\(docs\/_x_\.md\)<\/span>/);
+});
+
+test("emphasis still works in link labels and around links", () => {
+  assert.equal(html("[**bold** _it_](https://example.com)"), '<p><a href="https://example.com" rel="noopener noreferrer" target="_blank"><strong>bold</strong> <em>it</em></a></p>');
+  assert.equal(html("*see [a](https://example.com/_x_)*"), '<p><em>see <a href="https://example.com/_x_" rel="noopener noreferrer" target="_blank">a</a></em></p>');
+  assert.equal(html("[`code`](https://example.com)"), '<p><a href="https://example.com" rel="noopener noreferrer" target="_blank"><code>code</code></a></p>');
 });
 
 test("markdownPage escapes title and source", () => {
