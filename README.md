@@ -2,6 +2,8 @@
 
 herdr-crew is a local web dashboard and an agent skill for projects with several coding agents, mostly OpenCode, running in [Herdr](https://herdr.dev). It was extracted from a project-specific dashboard. It requires Node 22 or newer (tested on Node 24), has no dependencies, and needs no global installation.
 
+Plan, decisions and history: [PLAN.md](PLAN.md). Open work: `backlog task list --plain` (Backlog.md, prefix CREW).
+
 ## Quick start
 
 From this checkout, run:
