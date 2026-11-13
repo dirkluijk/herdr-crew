@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@m5-panels'
 created_date: '2026-11-13 13:19'
-updated_date: '2026-11-13 13:30'
+updated_date: '2026-11-13 13:54'
 labels:
   - ui
   - actions
@@ -53,6 +53,8 @@ Implemented on feat/panels, commit e5db88d.
 Validation: npm test 159/159 (twice), npm run check ok. test/agents.test.mjs: close sequence and stored fields, refusals (lead, working, blocked, other pane or name, 2 panes, unknown pane count, failed tab close), unregistered and non-OpenCode close, reopen sequence and label, fallback label and project cwd, refusals (no or bad session, unknown persona, name live elsewhere, list failure, cwd outside, symlink out, missing dir, no workspace), failed start closes the tab, missing pane id, one action at a time, allowedCwd with worktrees. server.test.mjs: route guards (403, 400), close refusals and success with stored session and log, lead refused, reopen refused for live and sessionless agents, success command sequence and log, failed start cleanup. Manual: own instance on 5277 with the stub herdr on PATH (no real Herdr calls), headless Chrome: Close and Reopen buttons on the right cards, both confirm dialogs, toasts, stub log shows tab close, tab create and agent start, actions.log lines and the stored session in the persona. No real agents were closed or started.
 
 crew-orch 2026-11-13: reviewed, rebased onto main, npm test 159 pass, fast-forward merged as 43ed8a2 and pushed; restarted 5192 and 5190 (both 200). Closed personas from before CREW-18 have no stored session, so canReopen is false for them.
+
+crew-orch 2026-11-13: real test by the user on 5192: closed m5-panels (tab w2G:t6) and reopened it (tab w2G:t8, pane w2G:pA) with the same session ses_e2b14f608ffeLuzNMQiVr8m2kV in the worktree cwd; both logged in actions.log. Backfilled session and cwd (project) for m1-parser, m2-tests, m3-skill and m4-snappy from opencode session list, so their cards can be reopened; m4-snappy gets the project as cwd because its worktree was removed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
