@@ -1,0 +1,3 @@
+#!/usr/bin/env node
+// Stub for the opencode CLI in tests, so a stored session never reaches the real OpenCode.
+process.exit(1);

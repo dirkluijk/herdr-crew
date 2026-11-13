@@ -1,22 +1,36 @@
 #!/usr/bin/env node
 // Stub for the herdr CLI in tests: one idle agent whose screen is the file in HERDR_CREW_TEST_SCREEN, and every
-// call is logged so tests can see what ran.
+// call is logged so tests can see what ran. HERDR_CREW_TEST_STATE points to an optional JSON file that changes the
+// answers: { status, panes, startFail, createNoPane, extraAgents }.
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 const args = process.argv.slice(2);
 if (process.env.HERDR_CREW_TEST_LOG) appendFileSync(process.env.HERDR_CREW_TEST_LOG, JSON.stringify(args) + "\n");
+const stateFile = process.env.HERDR_CREW_TEST_STATE;
+const state = stateFile && existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, "utf8")) : {};
 const out = (result) => console.log(JSON.stringify({ result }));
 const [group, cmd] = args;
+const probe = {
+  name: "m9-probe", pane_id: "w99:p1", tab_id: "w99:t1", workspace_id: "w99", agent: "opencode", agent_status: state.status ?? "idle",
+  agent_session: { agent: "opencode", kind: "id", value: "ses_probe123" }, terminal_title: "OC | probe", cwd: process.env.HERDR_CREW_TEST_PROJECT,
+};
 
 if (group === "agent" && cmd === "list") {
-  out({ agents: [{ name: "m9-probe", pane_id: "w99:p1", tab_id: "w99:t1", workspace_id: "w99", agent_status: "idle", terminal_title: "OC | probe", cwd: process.env.HERDR_CREW_TEST_PROJECT }] });
+  out({ agents: [probe, ...(state.extraAgents ?? [])] });
 } else if (group === "tab" && cmd === "list") {
   out({ tabs: [{ tab_id: "w99:t1", label: "m9-probe (Probe, it)" }] });
 } else if (group === "agent" && cmd === "read") {
   const screen = process.env.HERDR_CREW_TEST_SCREEN;
   out({ text: screen && existsSync(screen) ? readFileSync(screen, "utf8") : "" });
 } else if (group === "agent" && cmd === "get") {
-  out({ agent: { agent_status: "idle" } });
+  out({ agent: probe, type: "agent_info" });
+} else if (group === "tab" && cmd === "get") {
+  out({ tab: { tab_id: args[2], label: "m9-probe (Probe, it)", pane_count: state.panes ?? 1, workspace_id: "w99" } });
+} else if (group === "tab" && cmd === "create") {
+  out(state.createNoPane ? { tab: { tab_id: "w99:t9" } } : { tab: { tab_id: "w99:t9" }, root_pane: { pane_id: "w99:p9" } });
+} else if (group === "agent" && cmd === "start" && state.startFail) {
+  console.error("agent did not become ready");
+  process.exit(1);
 } else {
   out({});
 }

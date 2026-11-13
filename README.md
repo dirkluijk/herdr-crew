@@ -57,7 +57,8 @@ herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
 | `tasks` | Task IDs. |
 | `lead` | Orchestrator hero card; can have an optional two-paragraph model summary. |
 | `messagePrefixes` | Prefixes used to recognise messages from this persona. |
-| `session` | OpenCode session ID; supplies last words for closed agents via `opencode session export`. |
+| `session` | OpenCode session ID; supplies last words for closed agents via `opencode session export`. Close stores it and Reopen resumes it; see Close and reopen agents. |
+| `cwd` | Folder of the agent, stored by Close and used by Reopen. |
 | `mascot` | A made-up colleague without a session, with rotating `lines[]` and `statuses[]`; no model calls. |
 
 The dashboard reads live `working`, `idle`, `done`, and `blocked` status from `herdr agent list`. Cards show an agent's own Herdr `say` token as a speech bubble (`✍️ own words`), greyed as the previous turn when work resumes. If there is no bubble, the card can show the last visible screen lines (`🖥 screen`). It also shows the latest incoming message and its sender: a `[agent-name]` prefix, a persona's `messagePrefixes`, or `You`. The OpenCode footer supplies a context bar, yellow from 70 percent and red from 85 percent. Closed agents appear greyed with their last words. Cards show tasks. An optional lead summary (`🤖`) needs `ANTHROPIC_FOUNDRY_API_KEY` and `ANTHROPIC_FOUNDRY_BASE_URL`, or `ANTHROPIC_API_KEY`.
@@ -158,6 +159,18 @@ herdr-crew widget list [--project DIR]
 ```sh
 herdr-crew widget add --project . --json '{"module":"markdown","options":{"id":"goals","title":"Goals","file":"PLAN.md","section":"Goal"}}'
 ```
+
+## Close and reopen agents
+
+Live idle or done agent cards have a ⏻ Close button. The lead persona has no Close button. After confirmation, the server checks `herdr agent get` again for the same pane and agent name, with status idle or done. It uses `herdr tab get` to require exactly one pane in the tab, so it cannot close a tab that also holds the dashboard or another pane. It then runs `herdr tab close`. OpenCode stops, but its session stays on disk.
+
+For an OpenCode agent with a persona in `.herdr-crew.json`, Close saves the Herdr `agent_session.value` (`ses_` ID) and the agent's cwd as `session` and `cwd`. Both fields are optional, so older configs still work. The closed card shows the session's last words. An agent without a persona can be closed, but nothing is saved and it cannot be reopened from the dashboard.
+
+Closed cards with a stored `session` have a ↻ Reopen button. After confirmation, the server uses a fresh `herdr agent list` to check that no agent with that name is live anywhere on the Herdr server. It checks the cwd, then runs `herdr tab create --workspace <crew workspace> --cwd <cwd> --label <label> --no-focus`. It takes the pane ID from `.result.root_pane.pane_id` and runs `herdr agent start <agent> --kind opencode --pane <pane> --timeout 60000 -- --session <ses_id>`. The label is the last tab label the dashboard saw, or `<agent> (<Name>, <pronouns>)`. No new briefing is sent. If the start fails, the server closes the new tab.
+
+The crew workspace comes from `workspace` in `.herdr-crew.json`, then `HERDR_WORKSPACE_ID`, then the workspace where most agents have their cwd in the project. Reopen is refused if none is available. The saved cwd, or the project if none was saved, must resolve to an existing directory in the project or one of its git worktrees from `git worktree list --porcelain`. This includes worktrees next to the main checkout. Other paths are refused; edit or remove `cwd` in the persona to reopen the agent in the project.
+
+Both actions require the usual Host, Origin, `X-Crew` and `confirmed` checks. Herdr calls use a fixed command map through `execFile`; pane and tab IDs come from Herdr output, never the browser. Only one close or reopen runs per agent at a time. Refusals return 409 with the reason, and Herdr failures return 502. Every close and reopen is recorded in `.herdr-crew/actions.log` with the tab, label, session and cwd.
 
 ## Safeguards
 

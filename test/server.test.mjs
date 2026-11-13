@@ -92,7 +92,7 @@ before(async () => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(ANTHROPIC|OPENAI|HERDR)_|^PORT$/.test(k)));
   Object.assign(env, {
     PATH: [join(APP, "test", "fixtures", "bin"), process.env.PATH].join(delimiter),
-    HERDR_CREW_TEST_LOG: herdrLog, HERDR_CREW_TEST_PROJECT: project, HERDR_CREW_TEST_SCREEN: screenFile, HERDR_CREW_TEST_TASKS: join(root, "tasks.json"),
+    HERDR_CREW_TEST_LOG: herdrLog, HERDR_CREW_TEST_PROJECT: project, HERDR_CREW_TEST_SCREEN: screenFile, HERDR_CREW_TEST_TASKS: join(root, "tasks.json"), HERDR_CREW_TEST_STATE: join(root, "herdr-state.json"),
   });
   stubEnv = env;
   server = spawn(process.execPath, [join(APP, "server.mjs"), "--project", project, "--port", String(port), "--files-port", String(filesPort), "--no-prompt"], { env, stdio: ["ignore", "pipe", "pipe"] });
@@ -147,6 +147,8 @@ const POSTS = [
   ["/api/agents/m9-probe/prompt", { text: "hello", confirmed: true }],
   ["/api/agents/m9-probe/register", { name: "X", confirmed: true }],
   ["/api/agents/m9-probe/keys", { keys: ["enter"], confirmed: true }],
+  ["/api/agents/m9-probe/close", { confirmed: true }],
+  ["/api/agents/m9-gone/reopen", { confirmed: true }],
   ["/api/widgets/probe/poke", { confirmed: true }],
 ];
 
@@ -180,6 +182,8 @@ test("dashboard: actions without confirmed: true get 400", async () => {
     ["/api/agents/m9-probe/type", { text: "y" }],
     ["/api/widgets/probe/poke", {}],
     ["/api/widgets/probe/poke", { confirmed: "yes" }],
+    ["/api/agents/m9-probe/close", {}],
+    ["/api/agents/m9-gone/reopen", { confirmed: 1 }],
   ];
   for (const [path, body] of cases) {
     const r = await api(path, { method: "POST", headers: ok(), body });
@@ -577,5 +581,95 @@ test("panel request: guards, no lead, then a quoted message through the draft gu
   assert.deepEqual((await prompts()).at(-1), ["agent", "prompt", "w99:p1", info.text]);
   const last = (await actionLog()).at(-1);
   assert.deepEqual(last.slice(1, 3), ["m9-probe (Probe, w99:p1)", "panel request"]);
+  await writeConfig({ personas: cfg.personas });
+});
+
+const herdrState = (s) => writeFile(join(root, "herdr-state.json"), JSON.stringify(s));
+const closeCalls = async () => (await herdrCalls()).filter((a) => a[0] === "tab" && a[1] === "close");
+
+test("close: refused while working or with more panes, then closes the tab and stores the session", async () => {
+  assert.ok(await until(async () => !JSON.parse((await api("/api/agents")).text).agents.find((a) => a.id === "m9-probe")?.lead));
+  const cfg = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  const close = () => api("/api/agents/m9-probe/close", { method: "POST", headers: ok(), body: { confirmed: true } });
+  const before = (await closeCalls()).length;
+  await herdrState({ status: "working" });
+  let r = await close();
+  assert.equal(r.status, 409);
+  assert.match(r.text, /working; only idle or done/);
+  await herdrState({ panes: 2 });
+  r = await close();
+  assert.equal(r.status, 409);
+  assert.match(r.text, /has 2 panes/);
+  assert.equal((await closeCalls()).length, before);
+
+  await herdrState({});
+  r = await close();
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual(JSON.parse(r.text), { ok: true, stored: true });
+  assert.deepEqual((await closeCalls()).at(-1), ["tab", "close", "w99:t1"]);
+  const probe = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8")).personas.find((p) => p.agent === "m9-probe");
+  assert.equal(probe.session, "ses_probe123");
+  assert.equal(probe.cwd, project);
+  const last = (await actionLog()).at(-1);
+  assert.deepEqual(last.slice(1, 3), ["m9-probe (Probe, w99:p1)", "close"]);
+  assert.equal(JSON.parse(last[3]).session, "ses_probe123");
+  await writeConfig({ personas: cfg.personas });
+});
+
+test("close: the lead persona has no close", async () => {
+  const cfg = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  await writeConfig({ personas: cfg.personas.map((p) => ({ ...p, lead: true })) });
+  assert.ok(await until(async () => JSON.parse((await api("/api/agents")).text).agents.find((a) => a.id === "m9-probe")?.lead));
+  const r = await api("/api/agents/m9-probe/close", { method: "POST", headers: ok(), body: { confirmed: true } });
+  assert.equal(r.status, 409);
+  assert.match(r.text, /lead persona/);
+  await writeConfig({ personas: cfg.personas });
+});
+
+test("reopen: refused for a live agent, then starts the stored session in a new tab", async () => {
+  const cfg = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  const reopen = (id) => api(`/api/agents/${id}/reopen`, { method: "POST", headers: ok(), body: { confirmed: true } });
+  let r = await reopen("m9-probe");
+  assert.equal(r.status, 409);
+  assert.match(r.text, /the agent is live/);
+
+  await writeConfig({ personas: [...cfg.personas,
+    { agent: "m9-gone", name: "Gone", pronouns: "it", role: "test", tasks: [], session: "ses_gone1", cwd: join(project, "docs") },
+    { agent: "m9-nosess", name: "None", pronouns: "it", role: "test", tasks: [] },
+  ] });
+  let snap;
+  assert.ok(await until(async () => (snap = JSON.parse((await api("/api/agents")).text)).agents.some((a) => a.id === "m9-nosess")));
+  assert.equal(snap.agents.find((a) => a.id === "m9-gone").canReopen, true);
+  assert.equal(snap.agents.find((a) => a.id === "m9-nosess").canReopen, false);
+  r = await reopen("m9-nosess");
+  assert.equal(r.status, 409);
+  assert.match(r.text, /no OpenCode session stored/);
+
+  await herdrState({ extraAgents: [{ name: "m9-gone", pane_id: "w5:p1", workspace_id: "w5" }] });
+  assert.ok(await until(async () => JSON.parse((await api("/api/agents")).text).agents.find((a) => a.id === "m9-gone").live));
+  const calls = (await herdrCalls()).length;
+  r = await reopen("m9-gone");
+  assert.equal(r.status, 409);
+  assert.match(r.text, /the agent is live/);
+  assert.ok(!(await herdrCalls()).slice(calls).some((a) => a[0] === "tab" && a[1] === "create"));
+  await herdrState({});
+  assert.ok(await until(async () => !JSON.parse((await api("/api/agents")).text).agents.find((a) => a.id === "m9-gone").live));
+
+  const from = (await herdrCalls()).length;
+  r = await reopen("m9-gone");
+  assert.equal(r.status, 200, r.text);
+  const seq = (await herdrCalls()).slice(from).filter((a) => ["create", "start"].includes(a[1]));
+  assert.deepEqual(seq, [
+    ["tab", "create", "--workspace", "w99", "--cwd", join(project, "docs"), "--label", "m9-gone (Gone, it)", "--no-focus"],
+    ["agent", "start", "m9-gone", "--kind", "opencode", "--pane", "w99:p9", "--timeout", "60000", "--", "--session", "ses_gone1"],
+  ]);
+  const last = (await actionLog()).at(-1);
+  assert.deepEqual(last.slice(1, 3), ["m9-gone", "reopen"]);
+
+  await herdrState({ startFail: true });
+  r = await reopen("m9-gone");
+  assert.equal(r.status, 502, r.text);
+  assert.deepEqual((await closeCalls()).at(-1), ["tab", "close", "w99:t9"]);
+  await herdrState({});
   await writeConfig({ personas: cfg.personas });
 });

@@ -284,6 +284,10 @@ const I18N = {
     dialogTitle: (n) => `Dialoog van ${n} beantwoorden`, dialogHint: "Kies toetsen in volgorde, of typ een eigen antwoord. Je bevestigt daarna nog een keer.", ownAnswer: "Of: eigen antwoord als tekst (zonder Enter)",
     keysLbl: "toetsen in dialoog", textLbl: "tekst in dialoog", log: "Log", hideLog: "Log verbergen", running: "draait",
     removePanel: "Paneel verwijderen", remove: "Verwijderen",
+    closeBtn: "⏻ Sluiten", reopenBtn: "↻ Heropenen", closeTitle: (n) => `${n} sluiten`, reopenTitle: (n) => `${n} heropenen`, logNote: "Deze actie komt in .herdr-crew/actions.log.",
+    closeText: (a) => `Sluit de Herdr-tab van ${a.name} (${a.id}, ${a.pane}). OpenCode stopt, de sessie blijft bewaard. ${a.registered ? "Het dashboard onthoudt de sessie en de map, zodat je de agent later met Heropenen terugkrijgt." : "Deze agent staat niet in .herdr-crew.json, dus Heropenen kan daarna niet."} De server sluit alleen als ${a.name} wacht of klaar is en als enige in de tab staat.`,
+    reopenText: (a) => `Start de bewaarde OpenCode-sessie van ${a.name} opnieuw in een nieuwe tab ${a.label ?? `${a.id} (${a.name}${a.pronouns ? `, ${a.pronouns}` : ""})`}, als agent ${a.id}. Er gaat geen nieuwe briefing mee. Het kan tot een minuut duren.`,
+    closedToast: (n) => `${n} is gesloten.`, reopenedToast: (n) => `${n} is weer gestart in een nieuwe tab.`,
     addPanel: "＋ Paneel", addPanelTitle: "Paneel toevoegen", panelPh: "Bijvoorbeeld: een mini-overzicht van alle open taken, of een link naar PLAN.md",
     panelHint: (n) => `Beschrijf in gewone woorden welk paneel je wilt. ${n} maakt er een paneel van met een ingebouwd type (links, backlog, markdown of dev-server) en voegt het toe; er wordt geen HTML of code gemaakt. Je ziet het bericht nog voordat het verstuurd wordt.`,
     panelNoLead: "Er staat geen lead persona in .herdr-crew.json (lead: true), dus er is niemand die het paneel kan maken.",
@@ -320,6 +324,10 @@ const I18N = {
     dialogTitle: (n) => `Answer ${n}'s dialog`, dialogHint: "Pick keys in order, or type your own answer. You confirm once more after this.", ownAnswer: "Or: your own answer as text (without Enter)",
     keysLbl: "keys in dialog", textLbl: "text in dialog", log: "Log", hideLog: "Hide log", running: "running",
     removePanel: "Remove panel", remove: "Remove",
+    closeBtn: "⏻ Close", reopenBtn: "↻ Reopen", closeTitle: (n) => `Close ${n}`, reopenTitle: (n) => `Reopen ${n}`, logNote: "This action goes into .herdr-crew/actions.log.",
+    closeText: (a) => `Closes the Herdr tab of ${a.name} (${a.id}, ${a.pane}). OpenCode stops, the session stays on disk. ${a.registered ? "The dashboard remembers the session and folder, so you can bring the agent back with Reopen." : "This agent is not in .herdr-crew.json, so it cannot be reopened afterwards."} The server only closes when ${a.name} is waiting or done and is the only pane in its tab.`,
+    reopenText: (a) => `Starts the stored OpenCode session of ${a.name} again in a new tab ${a.label ?? `${a.id} (${a.name}${a.pronouns ? `, ${a.pronouns}` : ""})`}, as agent ${a.id}. No new briefing is sent. This can take up to a minute.`,
+    closedToast: (n) => `${n} is closed.`, reopenedToast: (n) => `${n} started again in a new tab.`,
     addPanel: "＋ Panel", addPanelTitle: "Add a panel", panelPh: "For example: a mini overview of all open tasks, or a link to PLAN.md",
     panelHint: (n) => `Describe in plain words which panel you want. ${n} turns it into a panel of a built-in type (links, backlog, markdown or dev-server) and adds it; no HTML or code is generated. You see the message before it is sent.`,
     panelNoLead: "There is no lead persona in .herdr-crew.json (lead: true), so nobody can make the panel.",
@@ -440,7 +448,7 @@ function card(a) {
     </div>
     <div class="conv">${conversation(a, bubble)}</div>
     ${a.live ? chatBox(a, st) : ""}
-    ${a.live ? actionsRow(a, st) : ""}
+    ${a.live ? actionsRow(a, st) : a.canReopen ? `<div class="actions"><button data-act="reopen" data-id="${esc(a.id)}">${L.reopenBtn}</button></div>` : ""}
     ${a.live && openScreens.has(a.id) ? `<pre class="screen" data-screen="${esc(a.id)}">${esc(screens[a.id] ?? L.loading)}</pre>` : ""}
     <div class="meta">${act}<span>${byTag(a)}<span data-ago="${esc(a.since ?? "")}">${ago(a.since)}</span></span></div>
   </div>`;
@@ -532,6 +540,7 @@ function actionsRow(a, st) {
     ${!a.lead && !a.mascot && (a.isNew || !a.registered) ? `<button data-act="onboard" data-id="${id}" class="welcome">${L.inform}</button>` : ""}
     ${!a.registered ? `<button data-act="register" data-id="${id}">${L.register}</button>` : ""}
     ${st === "blocked" ? `<button data-act="answer" data-id="${id}" class="urgent">${L.answer}</button>` : ""}
+    ${!a.lead && (st === "idle" || st === "done") ? `<button data-act="close" data-id="${id}">${L.closeBtn}</button>` : ""}
   </div>`;
 }
 
@@ -722,6 +731,17 @@ async function openTask(id) {
   else pre.textContent = data.text;
 }
 
+// A plain confirmation for actions on the agent itself, such as close and reopen.
+function confirmAction(title, text, button, fn) {
+  showModal(`<h3>${L.confirm}: ${esc(title)}</h3><p>${esc(text)}</p><p class="hint">${esc(L.logNote)}</p><div class="err"></div>
+    <div class="row"><button data-close>${L.cancel}</button><button class="danger" data-confirm>${esc(button)}</button></div>`);
+  modal.querySelector("[data-confirm]").onclick = async (ev) => {
+    ev.target.disabled = true;
+    modal.querySelector(".err").textContent = L.loading;
+    try { await fn(); modal.close(); } catch (e) { modal.querySelector(".err").textContent = e.message; ev.target.disabled = false; }
+  };
+}
+
 // Shows the exact target and content; sends only on an explicit click.
 function confirmStep(a, title, shown, sendFn) {
   showModal(`<h3>${L.confirm}: ${esc(title)}</h3>
@@ -861,6 +881,14 @@ document.addEventListener("click", async (ev) => {
     return;
   }
   if (act === "answer") return openAnswer(a);
+  if (act === "close") return confirmAction(L.closeTitle(a.name), L.closeText(a), L.closeBtn, async () => {
+    await api(`api/agents/${encodeURIComponent(a.id)}/close`, { confirmed: true });
+    showToast(L.closedToast(a.name));
+  });
+  if (act === "reopen") return confirmAction(L.reopenTitle(a.name), L.reopenText(a), L.reopenBtn, async () => {
+    await api(`api/agents/${encodeURIComponent(a.id)}/reopen`, { confirmed: true });
+    showToast(L.reopenedToast(a.name));
+  });
   if (act === "onboard") return openOnboard(a);
   if (act === "register") return openRegister(a);
   if (act === "focus" || act === "zoom") {
