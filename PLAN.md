@@ -25,6 +25,8 @@ The skill is installed as a copy in `~/.config/opencode/skills/herdr-crew/`.
 In that copy, `/path/to/herdr-crew` was replaced by the absolute path.
 The installed herdr-orchestrator skill has an added Prerequisites step 4: if a project has `.herdr-crew.json`, load the herdr-crew skill.
 Milestone agent `x-crewkit` (persona Rosa) built this under orchestrator Vera in the other-project workspace.
+This repo has its own crew: orchestrator `crew-orch` (persona Noor) in Herdr workspace `w2G`, config `.herdr-crew.json`, avatars in `avatars/`.
+Its dashboard runs at http://localhost:5192 (files origin 5193) in Herdr pane `w2G:p4`.
 
 ## Architecture (file map)
 
