@@ -81,6 +81,17 @@ Widget modules default-export `create({ project, stateDir, options, language })`
 
 The built-in `dev-server` accepts `id`, `title`, `cwd` (relative to the project), `command` (array; defaults to `npm run dev`), `port` (at least 1024), `pages` with `{ title, path }`, `requireNodeModules`, and `startTimeoutMs`. It starts the command detached, logging to `.herdr-crew/widget-<id>.log`. Stop refuses to kill a process on the port if its cwd is outside the widget cwd. The widget never installs anything or runs git.
 
+The built-in `links` widget shows a list of links with an optional note per link and for the widget:
+
+```json
+{"module":"links","options":{"id":"meeting","title":"Meeting","note":"Shown above the list.","links":[
+  {"label":"Slides","file":"meetings/deck.html","note":"Opens on the files origin."},
+  {"label":"Notes","file":"notes/cheat-sheet.md"},
+  {"label":"RFC","url":"https://example.com/rfc"}]}}
+```
+
+`url` takes http and https only. `file` is a path relative to the project; `render` is `html`, `markdown` or `text` and defaults to the extension. Browsers block `file://` links from an http page, so the server serves exactly these files, read only, on a second origin: `http://localhost:<port + 1>/files/<widget>/<key>` (change it with `filesPort` or `--files-port`). That listener only answers GET and HEAD for configured files whose real path, after resolving symlinks, is still the configured file inside the project. There is no listing, the Host header must match, and requests with `Sec-Fetch-Site: cross-site` are refused. Markdown is rendered to HTML with a Content Security Policy that allows no scripts; HTML files are served as they are. Because the files run on their own origin, a served page cannot call the dashboard API (its Origin does not match) and keeps its own localStorage. A page that stores state in localStorage therefore starts empty there, even if you used it earlier via `file://`.
+
 ## Safeguards
 
 Go to focuses an agent with `herdr agent focus`; Zoom toggles `herdr pane zoom --toggle`; Screen reads `herdr agent read --source visible`. Card chat sends on Enter only to idle or done agents and checks status again just before sending. Blocked agents have an Answer dialog for allowlisted keys or text, always with confirmation.

@@ -2,7 +2,7 @@
 // herdr-crew: a crew dashboard for any project with Herdr agents. Reads Herdr read only; actions only on a click.
 import { createServer } from "node:http";
 import { readFile, writeFile, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { join, dirname, resolve, extname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createInterface } from "node:readline/promises";
@@ -13,6 +13,7 @@ import { createOnboarding, registerPersona } from "./lib/onboarding.mjs";
 import { generateTheme, generateAvatars, imageEndpoint } from "./lib/theme.mjs";
 import { modelEndpoint } from "./lib/summary.mjs";
 import { buildConfig } from "./lib/init.mjs";
+import { renderMarkdown, markdownPage } from "./lib/markdown.mjs";
 
 const APP = dirname(fileURLToPath(import.meta.url));
 const CLI = `node ${join(APP, "server.mjs")}`;
@@ -150,12 +151,14 @@ const onboarding = createOnboarding({ project, cfg, crew, cli: process.env.HERDR
 const actions = createActions({ project, stateDir, cfg, guard, getSnapshot: crew.getSnapshot, onPrompt: crew.notePrompt, onboarding });
 
 // Widgets: "dev-server" loads widgets/dev-server.mjs from this app, a path loads a module relative to the project.
+const FILES_PORT = Number(args["files-port"] ?? cfg.filesPort ?? PORT + 1);
+const fileUrl = (widgetId, key) => `http://localhost:${FILES_PORT}/files/${encodeURIComponent(widgetId)}/${encodeURIComponent(key)}`;
 const widgets = [];
 for (const w of cfg.widgets ?? []) {
   try {
     const spec = /^[a-z0-9-]+$/.test(w.module) ? join(APP, "widgets", `${w.module}.mjs`) : resolve(project, w.module);
     const mod = await import(pathToFileURL(spec).href);
-    widgets.push(mod.default({ project, stateDir, options: w.options ?? {}, language: cfg.language }));
+    widgets.push(mod.default({ project, stateDir, options: w.options ?? {}, language: cfg.language, fileUrl }));
   } catch (e) {
     say(`widget ${w.module} not loaded: ${e.message}`);
   }
@@ -198,7 +201,7 @@ async function handleWidgets(req, res, url) {
   const [, id, action] = m;
   if (!id) {
     if (req.method !== "GET") return send(res, 405, { error: "method not allowed" }), true;
-    const views = await Promise.all(widgets.map(async (w) => ({ id: w.id, title: w.title, ...(await w.view()) })));
+    const views = await Promise.all(widgets.map(async (w) => ({ id: w.id, title: w.title, hasLog: !!w.log, ...(await w.view()) })));
     return send(res, 200, views), true;
   }
   const w = widgets.find((x) => x.id === id);
@@ -285,6 +288,41 @@ createServer(async (req, res) => {
   res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache" });
   res.end(await readFile(file));
 }).listen(PORT, "127.0.0.1", () => say(`crew dashboard for ${cfg.title} on http://localhost:${PORT}`));
+
+// Files origin: a second listener on its own port, so served pages (which may run scripts, like a slide deck)
+// cannot call the dashboard API and keep their own localStorage. Only the files that widgets list are reachable.
+const servedFiles = new Map();
+for (const w of widgets) for (const [key, f] of Object.entries(w.files ?? {})) servedFiles.set(`${w.id}/${key}`, f);
+if (servedFiles.size) {
+  const filesHosts = new Set([`localhost:${FILES_PORT}`, `127.0.0.1:${FILES_PORT}`]);
+  const projectReal = realpathSync(project);
+  createServer(async (req, res) => {
+    const deny = (code, text) => { res.writeHead(code, { "content-type": "text/plain" }); res.end(text); };
+    if (!filesHosts.has(req.headers.host ?? "")) return deny(421, "wrong host");
+    if (req.method !== "GET" && req.method !== "HEAD") return deny(405, "read only");
+    // Navigation from the dashboard or a typed URL is fine; fetches from other sites are not.
+    if (req.headers["sec-fetch-site"] === "cross-site") return deny(403, "cross-site");
+    const m = new URL(req.url, "http://localhost").pathname.match(/^\/files\/([^/]+)\/([^/]+)$/);
+    const f = m && servedFiles.get(`${decodeURIComponent(m[1])}/${decodeURIComponent(m[2])}`);
+    if (!f) return deny(404, "not found");
+    let real;
+    try { real = realpathSync(f.path); } catch { return deny(404, "not found"); }
+    if (real !== f.path || !real.startsWith(projectReal + "/")) return deny(404, "not found");
+    const body = await readFile(real, "utf8");
+    const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "x-frame-options": "DENY" };
+    if (f.render === "html") {
+      res.writeHead(200, { ...headers, "content-type": "text/html; charset=utf-8" });
+      return res.end(req.method === "HEAD" ? undefined : body);
+    }
+    if (f.render === "markdown") {
+      const { title, html } = renderMarkdown(body);
+      res.writeHead(200, { ...headers, "content-type": "text/html; charset=utf-8", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:" });
+      return res.end(req.method === "HEAD" ? undefined : markdownPage({ title, html, source: f.source }));
+    }
+    res.writeHead(200, { ...headers, "content-type": "text/plain; charset=utf-8" });
+    res.end(req.method === "HEAD" ? undefined : body);
+  }).listen(FILES_PORT, "127.0.0.1", () => say(`files for widgets on http://localhost:${FILES_PORT}/files/ (${servedFiles.size} files)`));
+}
 
 function loop(fn, ms) {
   const tick = async () => { try { await fn(); } catch (e) { console.error(e); } setTimeout(tick, ms); };

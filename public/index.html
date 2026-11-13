@@ -166,6 +166,12 @@
   .widget .btns button { padding: 0.35rem 0.85rem; border-radius: 10px; border: 1px solid #ffffff26; background: #ffffff12; color: var(--ink); }
   .widget .btns button:disabled { opacity: 0.35; cursor: not-allowed; }
   .widget a.url { color: var(--accent2); }
+  .widget .btns:empty { display: none; }
+  .linklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+  .linklist a { color: var(--accent); font-weight: 600; text-decoration: none; } .linklist a:hover { text-decoration: underline; }
+  .linklist a.off { opacity: 0.4; pointer-events: none; }
+  .linklist .info { font-size: 0.72rem; }
+  .linklist .hint { font-size: 0.8rem; margin-top: 0.1rem; }
   .widget pre { margin: 0; max-height: 14rem; overflow: auto; background: #0b0a12; padding: 0.6rem; border-radius: 10px; font-size: 0.72rem; color: #d8d4ee; }
   dialog { width: min(760px, 92vw); border: 0; border-radius: 18px; padding: 1.3rem 1.5rem; background: var(--panel); color: var(--ink); box-shadow: 0 20px 60px #000a; }
   dialog::backdrop { background: #0009; }
@@ -617,12 +623,14 @@ const widgetLog = {};
 let widgetViews = [];
 function widgetPanel(w) {
   return `<div class="widget">
-    <div class="state"><span class="dot ${w.state}"></span><b>${esc(w.title)}</b> <span>${w.url ? `<a class="url" href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.text)}</a>` : esc(w.text ?? "")}</span></div>
+    <div class="state">${w.list ? "" : `<span class="dot ${w.state}"></span>`}<b>${esc(w.title)}</b> ${w.list ? "" : `<span>${w.url ? `<a class="url" href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.text)}</a>` : esc(w.text ?? "")}</span>`}</div>
+    ${w.list && w.text ? `<div class="hint">${esc(w.text)}</div>` : ""}
     ${(w.info ?? []).map((i) => `<div class="info">${esc(i)}</div>`).join("")}
     ${w.warning ? `<div class="warn">${esc(w.warning)}</div>` : ""}${w.error ? `<div class="err">${esc(w.error)}</div>` : ""}
     <div class="btns">${(w.buttons ?? []).map((b) => `<button data-widget="${esc(w.id)}" data-waction="${esc(b.action)}" ${b.disabled ? "disabled" : ""}>${esc(b.label)}</button>`).join("")}
-      <button data-widget="${esc(w.id)}" data-waction="log">${widgetLog[w.id] ? L.hideLog : L.log}</button></div>
-    ${(w.links ?? []).length ? `<div class="links">${w.links.map((l) => `<a class="${l.enabled ? "" : "off"}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>`).join("")}</div>` : ""}
+      ${w.hasLog ? `<button data-widget="${esc(w.id)}" data-waction="log">${widgetLog[w.id] ? L.hideLog : L.log}</button>` : ""}</div>
+    ${(w.links ?? []).length && w.list ? `<ul class="linklist">${w.links.map((l) => `<li><a class="${l.enabled ? "" : "off"}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>${l.file ? ` <span class="info">${esc(l.file)}</span>` : ""}${l.note ? `<div class="hint">${esc(l.note)}</div>` : ""}</li>`).join("")}</ul>` : ""}
+    ${(w.links ?? []).length && !w.list ? `<div class="links">${w.links.map((l) => `<a class="${l.enabled ? "" : "off"}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>`).join("")}</div>` : ""}
     ${widgetLog[w.id] ? `<pre data-wlog="${esc(w.id)}">${L.loading}</pre>` : ""}
   </div>`;
 }
