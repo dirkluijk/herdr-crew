@@ -25,6 +25,10 @@ if (cmd === "task" && sub === "view") {
     console.error(`Task ${id} not found.`);
     process.exit(1);
   }
+} else if (cmd === "task" && sub === "list" && process.env.HERDR_CREW_TEST_TASKS) {
+  const { readFileSync, existsSync } = await import("node:fs");
+  const file = process.env.HERDR_CREW_TEST_TASKS;
+  console.log(existsSync(file) ? readFileSync(file, "utf8") : JSON.stringify({ tasks: [] }));
 } else {
   console.log(JSON.stringify({ tasks: [] }));
 }

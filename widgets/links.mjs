@@ -1,13 +1,12 @@
 // Links widget: web links and local project files. Local files are served read only by the files origin
 // (see server.mjs), and only the exact files listed here; nothing else in the project is reachable.
-import { realpathSync, statSync } from "node:fs";
-import { extname, resolve, sep } from "node:path";
+import { extname } from "node:path";
+import { projectFile } from "../lib/project-file.mjs";
 
 const RENDER = { ".html": "html", ".htm": "html", ".md": "markdown", ".markdown": "markdown" };
 
 export default function create({ project, options, language, fileUrl }) {
   const id = options.id ?? "links";
-  const root = realpathSync(project);
   const files = {};
   const problems = [];
   const links = (options.links ?? []).map((l, i) => {
@@ -19,9 +18,7 @@ export default function create({ project, options, language, fileUrl }) {
       return { title: label, note, url: ok ? String(l.url) : null };
     }
     try {
-      // realpath keeps symlinks from pointing outside the project.
-      const path = realpathSync(resolve(project, String(l.file)));
-      if (!path.startsWith(root + sep) || !statSync(path).isFile()) throw new Error("outside the project or not a file");
+      const path = projectFile(project, l.file);
       const key = `${i}-${String(l.file).split("/").pop().toLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/^-|-$/g, "")}`.slice(0, 80);
       files[key] = { path, render: ["html", "markdown", "text"].includes(l.render) ? l.render : RENDER[extname(path).toLowerCase()] ?? "text", source: String(l.file) };
       return { title: label, note, url: fileUrl(id, key), file: String(l.file) };

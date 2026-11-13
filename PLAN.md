@@ -54,10 +54,12 @@ It also handles the crew onboarding endpoint.
 It uses `ANTHROPIC_FOUNDRY_*` or `ANTHROPIC_API_KEY`.
 `lib/theme.mjs`: prompted theme generation and validation, plus avatars through an images API.
 `lib/init.mjs`: config initialization from plan persona patterns, live tab labels, optional `personas.json` import, and macOS terminal app detection for Go to from the environment (`HERDR_CREW_TERMINAL` first, then bundle id, terminal variables, and `TERM_PROGRAM`).
-`lib/markdown.mjs`: small Markdown renderer for the links widget and Backlog.md task fields in the task modal.
+`lib/markdown.mjs`: small Markdown renderer for the links and markdown widgets and Backlog.md task fields in the task modal.
 `public/index.html`: the page, with Dutch and English strings, themes, cards, chat, dialogs, widgets, drag, and pin layout.
 The task modal renders `backlog task view <id> --json` (schemaVersion 1) with a status pill, read only acceptance criteria checkboxes, sections, and clickable dependencies; it falls back to plain text for an unknown schemaVersion.
-`widgets/dev-server.mjs` and `widgets/links.mjs`: built-in widgets.
+`lib/widgets.mjs`: the widget set that hot reloads `widgets` entries (keep, create, dispose) and removes an entry for the remove button.
+`lib/project-file.mjs`: the real path rule for project files, shared by the links and markdown widgets.
+`widgets/dev-server.mjs`, `widgets/links.mjs`, `widgets/backlog.mjs` and `widgets/markdown.mjs`: built-in widgets; backlog and markdown export `validate(options)`.
 `skills/herdr-crew/SKILL.md`: agent skill, with `skills/herdr-crew/crew.mjs` as launcher.
 `README.md`: user documentation.
 `backlog/`: this project's Backlog.md data, using the `CREW` prefix.

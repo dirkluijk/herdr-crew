@@ -55,6 +55,12 @@ before(async () => {
   await mkdir(join(project, "docs"), { recursive: true });
   await writeFile(join(project, "docs", "notes.md"), "# Notes\n\n<script>alert(1)</script>\n");
   await writeFile(join(project, "page.html"), "<h1>page</h1>");
+  await writeFile(join(root, "tasks.json"), JSON.stringify({ tasks: [
+    { id: "CREW-2", title: "Second", status: "To Do", priority: "low", labels: ["ui"], assignees: [] },
+    { id: "CREW-1", title: "First <b>one</b>", status: "In Progress", priority: "high", labels: ["ui", "widgets"], assignees: ["@m2-tests"] },
+    { id: "CREW-3", title: "Third", status: "Done", priority: "medium", labels: ["docs"], assignees: [] },
+  ] }));
+  await writeFile(join(project, "PLAN.md"), "# Plan\n\n## Goals\n\nShip <script>x</script> panels.\n\n## Later\n\nNot shown.\n");
   await writeFile(join(project, "secret.txt"), "not listed");
   await writeFile(join(root, "outside.md"), "# outside the project");
   await symlink(join(root, "outside.md"), join(project, "link-out.md"));
@@ -86,7 +92,7 @@ before(async () => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(ANTHROPIC|OPENAI|HERDR)_|^PORT$/.test(k)));
   Object.assign(env, {
     PATH: [join(APP, "test", "fixtures", "bin"), process.env.PATH].join(delimiter),
-    HERDR_CREW_TEST_LOG: herdrLog, HERDR_CREW_TEST_PROJECT: project, HERDR_CREW_TEST_SCREEN: screenFile,
+    HERDR_CREW_TEST_LOG: herdrLog, HERDR_CREW_TEST_PROJECT: project, HERDR_CREW_TEST_SCREEN: screenFile, HERDR_CREW_TEST_TASKS: join(root, "tasks.json"),
   });
   stubEnv = env;
   server = spawn(process.execPath, [join(APP, "server.mjs"), "--project", project, "--port", String(port), "--files-port", String(filesPort), "--no-prompt"], { env, stdio: ["ignore", "pipe", "pipe"] });
@@ -471,4 +477,31 @@ test("widgets: inherited property names are no actions", async () => {
     assert.equal((await api(`/api/widgets/probe/${action}`)).status, 405, action);
     assert.equal((await api(`/api/widgets/probe/${action}`, { method: "POST", headers: ok(), body: { confirmed: true } })).status, 404, action);
   }
+});
+
+test("widgets: backlog and markdown panels render from the config", async () => {
+  const cfg = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  await writeConfig({ widgets: [...cfg.widgets,
+    { module: "backlog", options: { id: "open", title: "Open", filters: { status: ["In Progress", "To Do"] } } },
+    { module: "markdown", options: { id: "goals", file: "PLAN.md", section: "Goals" } },
+    { module: "markdown", options: { id: "escape", file: "../outside.md" } },
+  ] });
+  let views;
+  assert.ok(await until(async () => (views = await widgetViews()).some((v) => v.id === "goals") && views.find((v) => v.id === "open")?.groups?.length));
+  const open = views.find((v) => v.id === "open");
+  assert.deepEqual(open.groups.map((g) => [g.title, g.tasks.map((t) => t.id)]), [["In Progress", ["CREW-1"]], ["To Do", ["CREW-2"]]]);
+  assert.equal(open.groups[0].tasks[0].title, "First <b>one</b>");
+  const goals = views.find((v) => v.id === "goals");
+  assert.match(goals.html, /<h2 id="goals">Goals<\/h2>/);
+  assert.match(goals.html, /&lt;script&gt;/);
+  assert.doesNotMatch(goals.html, /<script|Not shown/);
+  assert.equal(goals.links[0].url, `http://localhost:${filesPort}/files/goals/file`);
+  assert.equal((await files("/files/goals/file")).status, 200);
+  const escape = views.find((v) => v.id === "escape");
+  assert.equal(escape.html, undefined);
+  assert.match(escape.error, /file must be a path inside the project/);
+
+  await writeFile(join(project, "PLAN.md"), "# Plan\n\n## Goals\n\nChanged.\n");
+  assert.ok(await until(async () => /Changed\./.test((await widgetViews()).find((v) => v.id === "goals").html)), "markdown not refreshed");
+  await writeConfig({ widgets: cfg.widgets });
 });

@@ -178,7 +178,10 @@ const actions = createActions({ project, stateDir, cfg, guard, getSnapshot: crew
 // Widgets: "dev-server" loads widgets/dev-server.mjs from this app, a path loads a module relative to the project.
 const FILES_PORT = Number(args["files-port"] ?? cfg.filesPort ?? PORT + 1);
 const fileUrl = (widgetId, key) => `http://localhost:${FILES_PORT}/files/${encodeURIComponent(widgetId)}/${encodeURIComponent(key)}`;
-const widgets = createWidgetSet({ app: APP, project, stateDir, fileUrl, say });
+const widgets = createWidgetSet({
+  app: APP, project, stateDir, fileUrl, say,
+  context: { backlog: { enabled: () => !!cfg.backlog, tasks: crew.getTasks } },
+});
 let filesServer = null;
 async function syncWidgets() {
   const r = await widgets.sync(cfg.widgets ?? [], cfg.language);

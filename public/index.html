@@ -176,6 +176,16 @@
   .linklist .info { font-size: 0.72rem; }
   .linklist .hint { font-size: 0.8rem; margin-top: 0.1rem; }
   .widget pre { margin: 0; max-height: 14rem; overflow: auto; background: #0b0a12; padding: 0.6rem; border-radius: 10px; font-size: 0.72rem; color: #d8d4ee; }
+  .widget .wmd { overflow: auto; padding-right: 0.4rem; }
+  .widget .wmd > :first-child { margin-top: 0; }
+  .tgroups { display: flex; flex-direction: column; gap: 0.6rem; }
+  .tghead { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.2rem; display: flex; gap: 0.4rem; align-items: center; }
+  .tghead .n { background: #ffffff14; border-radius: 99px; padding: 0 0.45rem; }
+  .trow { display: flex; gap: 0.55rem; align-items: baseline; width: 100%; text-align: left; padding: 0.25rem 0.4rem; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 0.86rem; cursor: pointer; }
+  .trow:hover, .trow:focus-visible { background: #ffffff12; outline: none; }
+  .trow .tid { font: 0.74rem ui-monospace, monospace; color: var(--muted); flex: none; }
+  .trow .tprio { margin-left: auto; font-size: 0.7rem; color: var(--muted); flex: none; }
+  .trow .tprio.high { color: var(--blocked); }
   dialog { width: min(760px, 92vw); border: 0; border-radius: 18px; padding: 1.3rem 1.5rem; background: var(--panel); color: var(--ink); box-shadow: 0 20px 60px #000a; }
   dialog::backdrop { background: #0009; }
   dialog h3 { margin: 0 0 0.6rem; }
@@ -196,13 +206,13 @@
   .tview .meta { display: flex; justify-content: flex-start; gap: 0.35rem; flex-wrap: wrap; align-items: center; font-size: inherit; color: inherit; }
   .tpill { background: var(--c); color: var(--bg); font-size: 0.78rem; font-weight: 700; padding: 0.12rem 0.65rem; border-radius: 99px; }
   .tview h4 { margin: 1.1rem 0 0.35rem; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-  .tview .md { font-size: 0.9rem; line-height: 1.5; overflow-wrap: anywhere; }
-  .tview .md p, .tview .md ul, .tview .md ol { margin: 0.3rem 0; }
-  .tview .md h1, .tview .md h2, .tview .md h3 { font-size: 1rem; margin: 0.8rem 0 0.3rem; }
-  .tview .md code { font-size: 0.85em; background: #ffffff14; padding: 0.05rem 0.3rem; border-radius: 4px; }
-  .tview .md table { border-collapse: collapse; } .tview .md th, .tview .md td { border: 1px solid #ffffff26; padding: 0.2rem 0.45rem; text-align: left; }
-  .tview .md a { color: var(--accent2); }
-  .tview .md blockquote { margin: 0.4rem 0; padding-left: 0.8rem; border-left: 3px solid var(--accent); }
+  :is(.tview, .widget) .md { font-size: 0.9rem; line-height: 1.5; overflow-wrap: anywhere; }
+  :is(.tview, .widget) .md p, :is(.tview, .widget) .md ul, :is(.tview, .widget) .md ol { margin: 0.3rem 0; }
+  :is(.tview, .widget) .md h1, :is(.tview, .widget) .md h2, :is(.tview, .widget) .md h3 { font-size: 1rem; margin: 0.8rem 0 0.3rem; text-transform: none; letter-spacing: normal; font-family: var(--font-body); color: var(--ink); }
+  :is(.tview, .widget) .md code { font-size: 0.85em; background: #ffffff14; padding: 0.05rem 0.3rem; border-radius: 4px; }
+  :is(.tview, .widget) .md table { border-collapse: collapse; } :is(.tview, .widget) .md th, :is(.tview, .widget) .md td { border: 1px solid #ffffff26; padding: 0.2rem 0.45rem; text-align: left; }
+  :is(.tview, .widget) .md a { color: var(--accent2); }
+  :is(.tview, .widget) .md blockquote { margin: 0.4rem 0; padding-left: 0.8rem; border-left: 3px solid var(--accent); }
   .tview .checks { list-style: none; padding: 0; margin: 0; }
   .tview .checks li { display: flex; gap: 0.55rem; align-items: flex-start; }
   .tview .checks input { margin-top: 0.4rem; accent-color: var(--done); }
@@ -915,7 +925,12 @@ document.addEventListener("dragend", () => {
   pendingSnap = null;
 });
 
-// Widgets: generic rendering of the view each plugin returns.
+// Widgets: generic rendering of the view each plugin returns. html is markdown rendered and escaped by the server.
+function taskGroups(w) {
+  return `<div class="tgroups">${w.groups.map((g) => `<div class="tgroup"><div class="tghead">${esc(g.title)} <span class="n">${esc(g.count)}</span></div>
+    ${g.tasks.map((t) => `<button class="trow" data-task="${esc(t.id)}" title="${esc(t.title)} (${esc(t.status)})"><span class="tid">${esc(t.id)}</span><span>${esc(t.title)}</span>${t.priority ? `<span class="tprio ${esc(t.priority)}">${esc(t.priority)}</span>` : ""}</button>`).join("")}</div>`).join("")}</div>
+    ${w.more ? `<div class="hint">${esc(w.more)}</div>` : ""}`;
+}
 const widgetLog = {};
 let widgetViews = [];
 function widgetPanel(w) {
@@ -925,6 +940,8 @@ function widgetPanel(w) {
     ${w.list && w.text ? `<div class="hint">${esc(w.text)}</div>` : ""}
     ${(w.info ?? []).map((i) => `<div class="info">${esc(i)}</div>`).join("")}
     ${w.warning ? `<div class="warn">${esc(w.warning)}</div>` : ""}${w.error ? `<div class="err">${esc(w.error)}</div>` : ""}
+    ${w.groups ? taskGroups(w) : ""}
+    ${typeof w.html === "string" && w.html ? `<div class="md wmd" style="max-height:${Number(w.maxHeight) || 400}px">${w.html}</div>` : ""}
     <div class="btns">${(w.buttons ?? []).map((b) => `<button data-widget="${esc(w.id)}" data-waction="${esc(b.action)}" ${b.disabled ? "disabled" : ""}>${esc(b.label)}</button>`).join("")}
       ${w.hasLog ? `<button data-widget="${esc(w.id)}" data-waction="log">${widgetLog[w.id] ? L.hideLog : L.log}</button>` : ""}</div>
     ${(w.links ?? []).length && w.list ? `<ul class="linklist">${w.links.map((l) => `<li><a class="${l.enabled ? "" : "off"}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title)}</a>${l.file ? ` <span class="info">${esc(l.file)}</span>` : ""}${l.note ? `<div class="hint">${esc(l.note)}</div>` : ""}</li>`).join("")}</ul>` : ""}
@@ -932,9 +949,26 @@ function widgetPanel(w) {
     ${widgetLog[w.id] ? `<pre data-wlog="${esc(w.id)}">${L.loading}</pre>` : ""}
   </div>`;
 }
+// Keyed like the cards: a panel is only rebuilt when its view changed, so scroll and focus survive a poll.
+const widgetEls = new Map();
 function renderWidgets() {
   setText("h-widgets", widgetViews.length ? config.theme?.sections?.widgets ?? L.sections.widgets : "");
-  document.getElementById("widgets").innerHTML = widgetViews.map(widgetPanel).join("");
+  const box = document.getElementById("widgets");
+  const els = widgetViews.map((w) => {
+    const key = `${JSON.stringify(w)}|${!!widgetLog[w.id]}|${config.language}`;
+    const old = widgetEls.get(w.id);
+    if (old?.key === key) return old.el;
+    tpl.innerHTML = widgetPanel(w).trim();
+    const el = tpl.content.firstElementChild;
+    const scroll = old?.el.querySelector(".wmd")?.scrollTop;
+    if (old?.el.isConnected) old.el.replaceWith(el);
+    if (scroll) requestAnimationFrame(() => { const m = el.querySelector(".wmd"); if (m) m.scrollTop = scroll; });
+    widgetEls.set(w.id, { key, el });
+    return el;
+  });
+  for (const id of [...widgetEls.keys()]) if (!widgetViews.some((w) => w.id === id)) widgetEls.delete(id);
+  els.forEach((el, i) => { if (box.children[i] !== el) box.insertBefore(el, box.children[i] ?? null); });
+  while (box.children.length > els.length) box.lastElementChild.remove();
   for (const w of widgetViews) if (widgetLog[w.id]) api(`api/widgets/${w.id}/log`).then((r) => {
     const pre = document.querySelector(`pre[data-wlog="${CSS.escape(w.id)}"]`);
     if (pre) { pre.textContent = r.text || "(empty)"; pre.scrollTop = pre.scrollHeight; }
