@@ -4,6 +4,7 @@ title: Add a remote for the herdr-crew repo
 status: To Do
 assignee: []
 created_date: '2026-11-13 10:14'
+updated_date: '2026-11-13 11:35'
 labels:
   - repo
 dependencies: []
@@ -21,3 +22,9 @@ ordinal: 6000
 - [ ] #1 Remote chosen by the user, added and pushed
 - [ ] #2 Backlog remote settings match the new setup
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+crew-orch 2026-11-13: user chose GitHub, private, on account dirkluijk.
+<!-- SECTION:NOTES:END -->

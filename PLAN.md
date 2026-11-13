@@ -15,7 +15,7 @@ Version: `0.1.0`.
 Local repository: `~/workspace/herdr-crew`, branch `main`, with no remote.
 The running instance serves `~/workspace/other-project` at http://localhost:5190.
 Its files origin is http://localhost:5191.
-It runs in Herdr pane `w2B:pZ` in that workspace.
+It runs in Herdr pane `w2B:p11` in that workspace.
 Its config is `~/workspace/other-project/.herdr-crew.json`.
 The config has more than 15 personas, the Night theme, a links widget named `deck`, and a dev-server widget named `docs-pushed`.
 That instance belongs to other-project. Do not stop or reconfigure it from this repo.

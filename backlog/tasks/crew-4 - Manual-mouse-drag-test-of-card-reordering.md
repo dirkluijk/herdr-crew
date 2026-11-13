@@ -4,6 +4,7 @@ title: Manual mouse drag test of card reordering
 status: To Do
 assignee: []
 created_date: '2026-11-13 10:14'
+updated_date: '2026-11-13 11:35'
 labels:
   - ui
 dependencies: []
@@ -21,3 +22,9 @@ Cards can be reordered and pinned (public/index.html: tool row per card with dra
 - [ ] #1 Real mouse drags in Chrome (and Safari if used) reorder cards, pin by dropping on the pinned area and unpin by dropping back
 - [ ] #2 No card jumps or flickers when a snapshot arrives during a drag
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+crew-orch 2026-11-13: user tests real mouse drags himself on the herdr-crew dashboard at http://localhost:5192.
+<!-- SECTION:NOTES:END -->
