@@ -72,7 +72,21 @@ By default, with a lead persona and `onboarding.via` set to `orchestrator`, Info
 
 On the first interactive start (TTY, unless `--no-prompt`), or with `--theme`, the app asks for a theme in free text, such as `retro arcade`. With Anthropic credentials, a model returns JSON for colours, font stacks, optional Google Fonts (up to three, loaded by the browser from fonts.googleapis.com), card radius, border, shadow, avatar shape and uppercase setting, background pattern, status labels, section headings, title, tagline, and avatar style. Patterns include gradient, solid, grid, dots, stripes, and scanlines. The server validates colours, enums, lengths, and characters before saving `theme` in `.herdr-crew.json`; later starts reuse it. `--reset-theme` or Back to default restores the default. The header's `🎨` button changes the theme at runtime. Without model access, the default theme stays in place.
 
-Only the theme text and project name go to the theme model. Theme avatars also send persona name, pronouns, role, and traits. Screens, tasks, and messages are never sent for them. `--theme-avatars` or its button starts background portrait generation through an OpenAI-compatible images API, using `OPENAI_FOUNDRY_API_KEY` and `OPENAI_FOUNDRY_BASE_URL`, or `OPENAI_API_KEY`. The model is set by `HERDR_CREW_IMAGE_MODEL` and defaults to `gpt-image-1`. Files go in `.herdr-crew/avatars/<theme>/`; failures leave the normal avatar in place.
+Only the theme text and project name go to the theme model. Screens, tasks, and messages are never sent.
+
+### Theme avatars
+
+While a theme is active, a card shows the theme avatar of its persona when one exists, and the normal avatar otherwise. There are two ways to make them.
+
+The default is to let an OpenCode agent with an image tool make the set, the same way new persona avatars are made (see the Avatars section of the herdr-crew skill). Only the persona's name, pronouns, role, and traits go into the image prompt, together with `theme.avatarStyle` from `.herdr-crew.json`. Pass two or three images from `avatarDir` as references so the faces stay recognisable. For each persona:
+
+1. Take the theme slug: `theme.name` in lowercase, every run of characters other than `a-z` and `0-9` replaced by `-`, leading and trailing `-` removed, at most 40 characters (`Retro Arcade` becomes `retro-arcade`).
+2. Save a square PNG of 384 by 384 pixels as `<project>/.herdr-crew/avatars/<slug>/<agent>.png`, where `<agent>` is the persona's agent name.
+3. Link it in `.herdr-crew.json` under the theme: `"theme": { ..., "avatars": { "<agent>": "<slug>/<agent>.png" } }`. Keep the other theme keys as they are.
+
+A running server reloads the config within about four seconds and serves the file as `/theme-avatars/<slug>/<agent>.png`. A new theme or Back to default starts with an empty `avatars` map.
+
+The server can also generate the set itself through an OpenAI-compatible images API, if you have an image deployment or an OpenAI API key: `--theme-avatars` or the Avatars in this theme button. It uses `OPENAI_FOUNDRY_API_KEY` and `OPENAI_FOUNDRY_BASE_URL`, or `OPENAI_API_KEY`. `HERDR_CREW_IMAGE_MODEL` sets the model or Foundry deployment name and defaults to `gpt-image-1`. It writes the same files and links them in `theme.avatars`; failures leave the normal avatar in place.
 
 ## Widgets
 
@@ -125,4 +139,4 @@ The draft skill is at [`skills/herdr-crew/SKILL.md`](skills/herdr-crew/SKILL.md)
 
 ## Limitations
 
-Screen parsing assumes the OpenCode TUI. Other agents still get status, own bubbles, and buttons, but screen fallback and the context bar may be empty. Theme avatar generation has not been tested end to end: the Azure Foundry resource used during development had no image deployment.
+Screen parsing assumes the OpenCode TUI. Other agents still get status, own bubbles, and buttons, but screen fallback and the context bar may be empty. Theme avatar generation through the images API has not been tested end to end: the Azure Foundry resource used during development had no image deployment, so the agent route is the default.

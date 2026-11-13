@@ -1,11 +1,11 @@
 ---
 id: CREW-2
 title: Theme avatars need an image deployment or API key
-status: To Do
+status: Done
 assignee:
   - '@m2-tests'
 created_date: '2026-11-13 10:14'
-updated_date: '2026-11-13 11:38'
+updated_date: '2026-11-13 11:57'
 labels:
   - theme
 dependencies: []
@@ -20,8 +20,16 @@ server.mjs --theme-avatars and the Avatars in this theme button call generateAva
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Either theme avatars are generated end to end for a test project, or the API path is replaced or removed and the README says how themed avatars are made
+- [x] #1 Either theme avatars are generated end to end for a test project, or the API path is replaced or removed and the README says how themed avatars are made
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. README Prompted theme section: make the agent route the default for themed avatars, with exact file locations, slug rules and the theme.avatars link, so an agent can do it without code changes.
+2. Keep the images API path described as optional (deployment or key), default model unchanged because no deployment could be tested.
+3. Update the Limitations line. Commit only my hunks.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -33,4 +41,15 @@ m2-tests 2026-11-13 11:38 UTC (12:38 CET): blocked, no working credentials for t
 - Direct probes on the same endpoint: gpt-image-2, gpt-image-1 and dall-e-3 all 404 DeploymentNotFound. GET /models lists catalog models (gpt-image-1, 1-mini, 1.5, 2, 2-flare, 2.5-flare, 2.5-sunburst, dall-e-2, dall-e-3), but these are models the resource could deploy, not deployments; none is deployed.
 - The OpenCode image tool that works with openai/gpt-image-2 uses the openai provider with OAuth (ChatGPT login) in the OpenCode auth store, not an API key. That token cannot be used as OPENAI_API_KEY for api.openai.com/v1/images/generations, and there is no OPENAI_API_KEY in the environment.
 - Options: (a) deploy an image model (for example gpt-image-2) on the Foundry resource and pass the deployment name via HERDR_CREW_IMAGE_MODEL, then rerun this test; (b) provide an OpenAI API key as OPENAI_API_KEY; (c) drop the API path and let an OpenCode agent with the image tool make the themed set, like new persona avatars. Needs a decision from the user.
+
+crew-orch 2026-11-13: user decision after the block: keep the images API path for anyone with a deployment or key, and document the agent route as the default in the README: an OpenCode agent with an image tool makes the themed set (same rules as new persona avatars: only name, pronouns, role, traits; 384 px; references from the current set; stored where the dashboard picks them up). Describe exactly where themed files go and how they are linked (theme.avatars), so an agent can do it without code changes. AC is met by the README path.
+
+m2-tests 2026-11-13: README Prompted theme section now has a Theme avatars subsection. Default route: an OpenCode agent with an image tool makes the set (only name, pronouns, role, traits plus theme.avatarStyle in the prompt; 2 or 3 references from avatarDir; 384 px square PNG), saved as .herdr-crew/avatars/<slug>/<agent>.png with the slug rule from generateAvatars, and linked as theme.avatars.<agent> = <slug>/<agent>.png in .herdr-crew.json. The images API path stays documented as optional (deployment or key, HERDR_CREW_IMAGE_MODEL as model or Foundry deployment name). Default model left at gpt-image-1: no deployment could be tested, so there is no evidence for another default. Limitations line updated.
+Verified the agent route against a temporary project with a running server (stub herdr, free port): card avatar null before; after copying a PNG to .herdr-crew/avatars/retro-arcade/m9-probe.png and setting theme.avatars with jq, the server logged config reloaded and /api/agents returned theme-avatars/retro-arcade/m9-probe.png, served as 200 image/png. No code changes.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Kept the images API path and documented the agent route as the default for theme avatars in the README: where the files go (.herdr-crew/avatars/<slug>/<agent>.png, with the slug rule), how they are linked (theme.avatars in .herdr-crew.json), what may go into the prompt, and that a running server picks them up within seconds. Verified that route end to end against a temporary project. The API path could not be tested (no image deployment, see notes); its default model is unchanged.
+<!-- SECTION:FINAL_SUMMARY:END -->
