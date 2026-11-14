@@ -1,29 +1,90 @@
 # herdr-crew
 
-herdr-crew is a local web dashboard and an agent skill for projects with several coding agents, mostly OpenCode, running in [Herdr](https://herdr.dev). It was extracted from a project-specific dashboard. It requires Node 22 or newer (tested on Node 24), has no dependencies, and needs no global installation.
+herdr-crew is a local web dashboard, two agent skills and two OpenCode commands for projects with several coding agents running side by side in [Herdr](https://herdr.dev), a terminal multiplexer for coding agents. It is for a crew where one long lived orchestrator plans the work and starts short lived milestone agents in separate Herdr tabs. Backlog.md tasks are the handover between them.
 
-Plan, decisions and history: [PLAN.md](PLAN.md). Open work: `backlog task list --plain` (Backlog.md, prefix CREW).
+The dashboard shows each agent's persona, live status, speech bubble, last incoming message, Backlog.md tasks and context bar. You can message agents, go to them in Herdr, onboard and register agents, close and reopen them, add panels, and change the theme or language. Actions require a click and confirmation. The server listens on `127.0.0.1` only.
+
+herdr-crew runs from a git clone with Node. It has no dependencies, build step or global npm install. It is licensed under MIT; see [LICENSE](LICENSE).
+
+<!-- Screenshot of the dashboard: docs/screenshot.png (to be added) -->
+
+## Requirements
+
+- Node 22 or newer. Tested on Node 24.
+- Herdr. Tested with 0.9.5. The dashboard uses `herdr agent read --format ansi` for card text and `herdr pane report-metadata --token` for agents' own bubbles. `node server.mjs doctor` checks both. Without the first, cards fall back to plain text; without the second, agents cannot set their own bubbles.
+- OpenCode is the best supported agent. Tested with 2.2.5. The skills and commands are for OpenCode, and dashboard chat needs its input box. The context bar, screen fallback, last words of closed agents and Reopen also depend on OpenCode.
+- Backlog.md is optional. Task cards and the backlog panel need `backlog task list --json` from version 1.49.0 or later. Live task updates need `--watch` from 1.52.0 or later; 1.53.0 or later is recommended because it fixes CPU use and stray watch processes. Without `--watch`, the dashboard polls every 15 seconds.
+- Model credentials are optional. `ANTHROPIC_API_KEY`, or `ANTHROPIC_FOUNDRY_API_KEY` with `ANTHROPIC_FOUNDRY_BASE_URL`, enables the lead summary and generated themes. `OPENAI_API_KEY`, or `OPENAI_FOUNDRY_API_KEY` with `OPENAI_FOUNDRY_BASE_URL`, enables server generated theme avatars. Without them, the default theme and plain bubbles remain; everything else works.
+
+Other agents in Herdr still get a card with status, their own bubble if they set it with `herdr pane report-metadata`, and Go to. The dashboard refuses chat prompts to them. herdr-crew was developed and tested on macOS. Linux should work but has had less testing: it opens the browser with `xdg-open`, while bringing the terminal app to the front after Go to works only on macOS. Windows is not supported.
+
+## Install
+
+```sh
+git clone <repository URL> herdr-crew
+cd herdr-crew
+node server.mjs install
+node server.mjs doctor
+```
+
+`install` links `skills/herdr-crew`, `skills/herdr-orchestrator`, `commands/crew.md` and `commands/orchestrate.md` from this checkout into the OpenCode config directory. It uses `--config-dir DIR` if supplied, otherwise `OPENCODE_CONFIG_DIR`, then `$XDG_CONFIG_HOME/opencode`, then `~/.config/opencode`.
+
+Before changing anything, it prints a plan for each path (`create`, `ok`, `exists` or `other link`) and asks for confirmation. `--yes` skips the question; `--dry-run` only shows the plan. You can run install again: correct links are left alone. If a path is a real file, directory or link to somewhere else, install changes nothing and exits 1. With `--force`, it first moves the old path to `<config dir>/herdr-crew-backup/<timestamp>/`, outside `skills/` and `commands/` so OpenCode does not load the backup as a second skill.
+
+The links mean a `git pull` updates the skills and commands without reinstalling. New OpenCode sessions pick them up.
+
+`doctor` is read only. It checks Node, Herdr and the two Herdr features, whether `HERDR_ENV=1` shows that it runs inside Herdr, OpenCode, Backlog.md and its `--json` and `--watch` support, model credentials, and each link. Each check says `ok`, `warning` or `missing` with a hint. It exits 1 if something is missing; `--short` prints only checks that are not ok.
 
 ## Quick start
 
-From this checkout, run:
+Open your project in Herdr and start OpenCode in a pane. Say "make a new Herdr crew" (or "maak een nieuwe Herdr crew"), or run `/crew`.
+
+The agent runs `doctor` and stops only if Node or Herdr is missing. It then asks in one round for the project directory (defaulting to the current directory), a unique orchestrator agent name (defaulting to `<directory name>-orch`), persona name and pronouns, dashboard and bubble languages, theme, avatar directory, port, and whether to add `.herdr-crew/` to `.gitignore`. English and Dutch ship with herdr-crew. The theme can be `default` or a description such as "a cosy bakery". The `auto` port setting picks the first free pair starting at 5190: one port for the dashboard and the next for the files origin.
+
+The agent writes `.herdr-crew.json` with `node server.mjs init` and non interactive flags, renames its Herdr agent and tab to the persona, and starts the dashboard in a split pane below it. The dashboard opens in your browser; the server asks nothing in that pane. If the agent has an image tool, it may make a portrait for its persona.
+
+The agent then continues as orchestrator using the `herdr-orchestrator` skill and asks you about the plan and milestones. It starts no other agents before the dashboard runs, so you can see each one appear.
+
+To set this up without an agent, run:
 
 ```sh
-node server.mjs init --project /path/to/project --plan PLAN.md
-node server.mjs --project /path/to/project
+node server.mjs init --project /path/to/project --orchestrator shop-orch --persona-name Vera --pronouns she/her --language en --theme default --port auto
+node server.mjs --project /path/to/project --no-prompt --open
 ```
 
-Open http://localhost:5190. You can also run `npx /path/to/herdr-crew --project /path/to/project` from a local checkout; `package.json` exposes the `herdr-crew` bin.
+To make an existing session the orchestrator without the new crew flow, run `/orchestrate`. You can pass the orchestrator name as an optional argument.
+
+## Uninstall
+
+```sh
+node server.mjs uninstall
+```
+
+Uninstall shows what it will remove and asks for confirmation. It removes only links in the OpenCode config directory's `skills/` and `commands/` that point into this checkout, including broken links. Everything else stays. `--yes` and `--dry-run` work as they do for install.
+
+You can then delete the clone. Each project's `.herdr-crew.json` and `.herdr-crew/` state folder remain; delete them by hand if you no longer need them.
+
+## Commands
+
+Run every command from the checkout as `node server.mjs <command>`. `node server.mjs help` prints the full list with all options. You can also run `npx /path/to/herdr-crew` from a local checkout; `package.json` exposes the `herdr-crew` bin.
 
 ```text
-herdr-crew [serve] [--project DIR] [--port N] [--theme ["free text"]] [--reset-theme] [--theme-avatars] [--no-prompt]
-herdr-crew init [--project DIR] [--plan PLAN.md] [--import personas.json] [--avatars DIR] [--language nl|en] [--port N] [--force]
+herdr-crew [serve] [--project DIR] [--port N] [--theme ["free text"]] [--reset-theme] [--theme-avatars] [--no-prompt] [--open]
+herdr-crew init [--project DIR] [--plan PLAN.md] [--import personas.json] [--avatars DIR] [--language CODE]
+               [--bubble-language CODE] [--port N|auto] [--title T] [--theme "free text"|default] [--force]
+               [--orchestrator AGENT --persona-name NAME [--pronouns P] [--role ROLE] [--prefixes "A,B"]]
 herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE] [--avatar KEY] [--traits a,b] [--project DIR]
 herdr-crew widget add --json '<entry>' | widget remove <id> | widget list  [--project DIR]
+herdr-crew locale list | locale check <file> | locale add <code> --file <file>  [--project DIR]
 herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
+herdr-crew install [--yes] [--force] [--dry-run] [--config-dir DIR]
+herdr-crew uninstall [--yes] [--dry-run] [--config-dir DIR]
+herdr-crew doctor [--config-dir DIR] [--short]
 ```
 
-`init` writes `<project>/.herdr-crew.json`. It reads personas from a plan: a back-ticked agent name followed by `(Name, pronouns)`, with the preceding clause ending in a colon as its role. It reads the orchestrator from `` `name`, persona Name (pronouns) `` and message prefixes from sentences such as `start with "Vera here."` or `start with "Vera hier."`. It also reads live Herdr labels in the form `<agent> (<Name>, <pronouns>)`. Use `--import` to add traits, quirk, session, avatar, mascot, lines, statuses, tasks, lead, and role from `personas.json`. `--avatars DIR` matches `<key>.png` by agent name or first name. If the plan says bubbles are Dutch, `init` chooses `nl`. `register` adds or updates a persona (for an existing persona only the changed fields are needed, e.g. `--avatar sjaak`); a running server reloads the config within about four seconds.
+`serve` is the default command. `--no-prompt` keeps the server from asking for a theme on its first interactive start, and `--open` opens the dashboard in the browser once it listens (`open` on macOS, `xdg-open` elsewhere).
+
+`init` writes `<project>/.herdr-crew.json`. It reads personas from a plan: a back-ticked agent name followed by `(Name, pronouns)`, with the preceding clause ending in a colon as its role. It reads the orchestrator from `` `name`, persona Name (pronouns) `` and message prefixes from sentences such as `start with "Vera here."` or `start with "Vera hier."`. It also reads live Herdr labels in the form `<agent> (<Name>, <pronouns>)`. Use `--import` to add traits, quirk, session, avatar, mascot, lines, statuses, tasks, lead, and role from `personas.json`. `--avatars DIR` matches `<key>.png` by agent name or first name. If the plan says bubbles are Dutch, `init` chooses `nl`. `init` never asks anything. The new crew flow uses its other flags: `--orchestrator` with `--persona-name`, `--pronouns`, `--role` and `--prefixes` adds the lead persona and skips live tab labels, because the workspace may hold tabs of other projects; the message prefixes default to `NAME here.`, plus `NAME hier.` when the bubble language is `nl`. `--port auto` takes the first pair of free ports from 5190. `--theme` generates the theme right away when model credentials are set, and marks the theme as asked so the server does not ask for one; `--theme default` keeps the default theme. `--avatars` creates the folder when it does not exist. `register` adds or updates a persona (for an existing persona only the changed fields are needed, e.g. `--avatar sjaak`); a running server reloads the config within about four seconds.
 
 `send` is how agents message each other. `herdr agent prompt` pastes text and presses Enter, so a prompt that arrives while the user is typing in that agent's input box is submitted together with the draft. `send` waits until the agent is idle or done and its OpenCode input box is empty, checks again every 2 seconds (`--interval`), and then prompts. It exits 0 when sent, 2 after the timeout (`--timeout`, default 100000 ms) and 1 on other errors. The user can still start typing between the check and the paste; that window is a single Herdr call.
 
@@ -201,15 +262,13 @@ Go to focuses an agent with `herdr agent focus` and opens its real screen in Her
 
 The server listens only on `127.0.0.1`. The Host header must be `localhost` or `127.0.0.1` with the port, otherwise the server returns 421 to guard against DNS rebinding. Every POST needs a same-origin Origin header and `X-Crew: 1`; cross-site requests cannot set that header without a preflight, which the server never approves. Persona IDs resolve to live panes on the server. Herdr calls use `execFile`, argument arrays, and a fixed command map. Static files are limited to the page, project avatars, and generated theme avatars. Every action goes into `.herdr-crew/actions.log`. Set `confirm.prompt` to true to require confirmation for chat messages.
 
-## Agent skill
+## Agent skills and commands
 
-The draft skill is at [`skills/herdr-crew/SKILL.md`](skills/herdr-crew/SKILL.md). It covers the crew conventions for every agent, and for the orchestrator how to set up and run the dashboard, how to register and brief new agents, and how to turn a panel request into a widget entry. It works next to an orchestration skill such as herdr-orchestrator, which only needs one line pointing to it. It is not installed anywhere. Install it as a symlink to this checkout, for example for OpenCode:
+`skills/herdr-crew/SKILL.md` defines crew conventions for every agent: setting its own bubble at the end of each turn, using message prefixes, and sending messages through the `send` command, which waits for an idle agent with an empty input box. For the orchestrator, it also covers the new crew flow, running the dashboard, registering and briefing agents with personas and avatars, and turning dashboard panel and language requests into config.
 
-```sh
-ln -s "$PWD/skills/herdr-crew" ~/.config/opencode/skills/herdr-crew
-```
+`skills/herdr-orchestrator/SKILL.md` defines the orchestrator and milestone agent workflow, with Backlog.md tasks as the handover. `commands/crew.md` provides `/crew`; `commands/orchestrate.md` provides `/orchestrate`.
 
-The skill runs commands through `skills/herdr-crew/crew.mjs`, a launcher that imports `../../server.mjs`. OpenCode reports the symlink path as the skill's base directory, and Node resolves the symlink when it loads the launcher, so the import reaches this checkout and skill changes apply without reinstalling. A copy of the skill has no checkout two levels up, and `node --preserve-symlinks-main` keeps the symlink path; in both cases the launcher fails and you need `node <checkout>/server.mjs`.
+The herdr-crew skill runs commands through `skills/herdr-crew/crew.mjs`, which imports `../../server.mjs`. OpenCode reports the link path as the skill base directory, and Node resolves the link when it loads the launcher, so the import reaches this checkout. A copied skill has no checkout two levels up, and `node --preserve-symlinks-main` also breaks the launcher. In either case, use `node <checkout>/server.mjs` directly.
 
 ## Environment
 
@@ -228,3 +287,7 @@ The skill runs commands through `skills/herdr-crew/crew.mjs`, a launcher that im
 ## Limitations
 
 Screen parsing assumes the OpenCode TUI. Other agents still get status, own bubbles, and buttons, but screen fallback and the context bar may be empty. Theme avatar generation through the images API has not been tested end to end: the Azure Foundry resource used during development had no image deployment, so the agent route is the default.
+
+## Development
+
+Run `npm test` and `npm run check`. The tests start their own servers on free ports with stub `herdr`, `backlog` and `opencode` commands, and use temporary projects and config folders. Plan, decisions and history are in [PLAN.md](PLAN.md); open work is in Backlog.md (`backlog task list --plain`, prefix CREW).
