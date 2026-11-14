@@ -50,3 +50,9 @@ Branch feat/release, commits b326ca9 and f4bf432.
 
 crew-orch 2026-11-14: rebased, npm test 196 pass, fast-forward merged as 1229896 and pushed; restarted 5192 and 5190. Linking commands/crew.md into the user's config waits for the user's go.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Saying make a new Herdr crew or running /crew asks one round of questions, writes the config with non interactive init flags (--orchestrator, --persona-name, --port auto, --theme), renames agent and tab, starts the dashboard with --no-prompt --open before any milestone agent, then continues as orchestrator. Verified end to end in throwaway projects; npm test 196 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
