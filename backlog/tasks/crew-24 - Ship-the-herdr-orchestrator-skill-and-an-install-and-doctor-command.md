@@ -51,3 +51,9 @@ crew-orch 2026-11-14: rebased, npm test 186 pass, fast-forward merged as 4c22702
 
 crew-orch 2026-11-14: with the user's go ran install --force --yes on the real config: commands/orchestrate.md and skills/herdr-orchestrator moved to ~/.config/opencode/herdr-crew-backup/2026-11-14T13-07-07-444Z and replaced by symlinks; doctor 12 ok.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The herdr-orchestrator skill and the orchestrate command are in the repo; node server.mjs install links skills and commands into the OpenCode config dir with a plan, confirmation and --force backups, uninstall removes only its own links, and doctor checks Node, Herdr, OpenCode, Backlog.md, credentials and links. Verified with npm test (186 pass) and on the user's machine: install --force with the user's go, doctor 12 ok.
+<!-- SECTION:FINAL_SUMMARY:END -->
