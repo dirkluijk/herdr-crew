@@ -1,11 +1,11 @@
 ---
 id: CREW-24
 title: Ship the herdr-orchestrator skill and an install and doctor command
-status: In Progress
+status: Done
 assignee:
   - '@m6-release'
 created_date: '2026-11-14 12:58'
-updated_date: '2026-11-14 13:07'
+updated_date: '2026-11-14 13:16'
 labels:
   - skill
   - release
