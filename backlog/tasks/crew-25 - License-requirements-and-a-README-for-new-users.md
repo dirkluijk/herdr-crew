@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@m6-release'
 created_date: '2026-11-14 12:58'
-updated_date: '2026-11-14 13:30'
+updated_date: '2026-11-14 13:37'
 labels:
   - docs
   - release
@@ -25,14 +25,16 @@ Goal (user 2026-11-14): the repo must be usable by anyone with Herdr. package.js
 - [x] #1 LICENSE contains the MIT license for Dirk Luijk, 2026
 - [x] #2 README has Requirements, Install, Quick start and Uninstall sections that match install and doctor
 - [x] #3 No personal paths or project names from other projects in README
-- [ ] #4 README.md is short and readable for new users, with emoji and the hero image, and links to DESIGN.md
-- [ ] #5 DESIGN.md contains all reference detail that left the README, with no facts lost
+- [x] #4 README.md is short and readable for new users, with emoji and the hero image, and links to DESIGN.md
+- [x] #5 DESIGN.md contains all reference detail that left the README, with no facts lost
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
 1. LICENSE (MIT, Dirk Luijk, 2026), add it to package.json files. 2. Collect facts: tested versions, Backlog.md versions for --json and --watch from its release notes, OpenCode only features, platforms. 3. Writer subagent for intro, Requirements, Install, Quick start, Uninstall and the skills section. 4. Merge with the existing reference sections, add a Commands reference and Development. 5. Check dashes, personal paths, and run the documented commands against temp dirs.
+
+6. Widened scope: short README with emoji, hero image and screenshot; all detail to DESIGN.md with an Architecture section; screenshot from an own instance with fictional personas.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -49,4 +51,11 @@ Branch feat/release, commit see git log (docs: add the MIT license and a README 
 - Checked the documented commands against temp dirs: the manual init example, install --dry-run, uninstall --dry-run. npm test 196 pass, npm run check ok.
 
 crew-orch 2026-11-14: hero illustration is docs/hero.jpg (1280x720, on main since the commit after 96457ab); rebase feat/release onto main to get it.
+
+Widened scope done in a1ef6cf (after rebasing onto main for docs/hero.jpg).
+- README.md is now short: hero image, what it is, Why, What you see with docs/dashboard.jpg, Requirements, Install, Quick start, Uninstall, Learn more, License. Emoji on section headings and a few bullets, prose by the writer subagent from a fact sheet. No em or en dashes.
+- DESIGN.md holds everything else: a new Architecture section (file map of server.mjs, lib, widgets, public, locales, skills, commands, test), Requirements in detail, Install and doctor, Uninstall, The new crew flow, Commands (CLI reference, init and send details) and all earlier reference sections unchanged (Configuration through Limitations, Agent skills and commands, Environment, Development). A script compared every line of the old README (main and the first CREW-25 version) with README plus DESIGN: what is missing is only reworded intro text, the old Quick start and the manual ln -s install that install replaces; the two remaining facts (extracted from a project dashboard, default URL on 5190) were added to DESIGN.md.
+- docs/dashboard.jpg (1440x1345, 246 kB): screenshot of my own dashboard on port 47310 for a fictional cosy-bakery project, with stub herdr, backlog and opencode commands on PATH (fake agents, statuses, bubbles and SHOP tasks), no model credentials, captured with headless Chrome over the DevTools protocol. Personas reuse the existing illustrated avatars (Noor, Pim, Tess, Ruben, Fenna, Daan) with fictional roles. Server stopped and temp files removed afterwards.
+- PLAN.md: only the file list line now points to DESIGN.md. package.json files includes DESIGN.md, LICENSE and docs.
+- npm test 196 pass, npm run check ok.
 <!-- SECTION:NOTES:END -->
