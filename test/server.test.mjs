@@ -740,9 +740,14 @@ test("languages: locale add makes a new language selectable without restart, the
   assert.equal((await crewCli("locale", "add", "en", "--file", file, "--project", project)).code, 1);
   r = await crewCli("locale", "add", "de", "--file", file, "--project", project);
   assert.equal(r.code, 0, r.out);
+  assert.ok(existsSync(join(project, ".herdr-crew-locales", "de.json")));
+  await mkdir(join(project, ".herdr-crew", "locales"), { recursive: true });
+  await writeFile(join(project, ".herdr-crew", "locales", "fr.json"), JSON.stringify({ ...en, "meta.name": "Français", "meta.englishName": "French" }));
+  assert.match((await crewCli("locale", "list", "--project", project)).out, /^fr\tFrançais\tFrench\t.*\.herdr-crew\/locales$/m);
   assert.match((await crewCli("locale", "list", "--project", project)).out, /^de\tDeutsch\tGerman\t/m);
 
   const langs = JSON.parse((await api("/api/config")).text).languages;
+  assert.ok(langs.some((l) => l.code === "fr" && l.project), "old .herdr-crew/locales not read");
   assert.deepEqual(langs.find((l) => l.code === "de"), { code: "de", name: "Deutsch", englishName: "German", project: true });
   assert.equal((await api("/api/language", { method: "POST", headers: ok(), body: { confirmed: true, language: "de" } })).status, 200);
   assert.equal(JSON.parse((await api("/api/config")).text).locale["ui.cancel"], "Abbrechen");
@@ -797,4 +802,22 @@ test("other projects: agents outside the project are shown with only Go to, own 
   assert.deepEqual(JSON.parse(r.text), { ok: true, stored: false });
   assert.deepEqual((await closeCalls()).at(-1), ["tab", "close", "w99:t8"]);
   await herdrState({});
+});
+
+test("languages: locale add writes to localesDir from the config, and ignores a localesDir outside the project", async () => {
+  const en = JSON.parse(await readFile(join(APP, "locales", "en.json"), "utf8"));
+  const file = join(root, "it.json");
+  await writeFile(file, JSON.stringify({ ...en, "meta.name": "Italiano", "meta.englishName": "Italian" }));
+  await writeConfig({ localesDir: "i18n/dashboard" });
+  let r = await crewCli("locale", "add", "it", "--file", file, "--project", project);
+  assert.equal(r.code, 0, r.out);
+  assert.ok(existsSync(join(project, "i18n", "dashboard", "it.json")));
+  await writeConfig({ localesDir: "../outside" });
+  r = await crewCli("locale", "add", "it", "--file", file, "--project", project);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /localesDir ignored/);
+  assert.ok(existsSync(join(project, ".herdr-crew-locales", "it.json")));
+  assert.ok(!existsSync(join(root, "outside", "it.json")));
+  const { localesDir, ...rest } = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
+  await writeFile(join(project, ".herdr-crew.json"), JSON.stringify(rest));
 });

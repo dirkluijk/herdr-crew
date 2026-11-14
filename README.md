@@ -37,6 +37,7 @@ herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
 | `title` | Dashboard title. |
 | `language` | UI language: a locale in `locales/`, `nl` or `en`; see Languages. Unknown values show English. |
 | `bubbleLanguage` | Language for agent speech bubbles. |
+| `localesDir` | Folder inside the project for project languages; defaults to `.herdr-crew-locales`. See Languages. |
 | `port` | HTTP port; defaults to `5190`. |
 | `workspace` | Optional Herdr workspace ID. Otherwise use `HERDR_WORKSPACE_ID` or the workspace where most agents have their cwd in the project. |
 | `backlog` | True when `backlog/` or `.backlog/` exists. Shows Backlog.md tasks per persona via `backlog task list --json`. A task opens read only in a modal from `backlog task view <id> --json` (schema version 1): status, labels, dependencies that open in the same modal, acceptance criteria as checkboxes, and the markdown sections rendered on the server. Other Backlog.md versions get the `--plain` text. |
@@ -83,7 +84,7 @@ The test suite checks that every locale has exactly the keys and placeholders of
 
 In the 🌐 dialog, Add language accepts a language name of at most 60 characters. It shows the exact message before confirmation, then sends it to the lead persona through the same check as chat. The lead must be idle or done with an empty input box; otherwise the request returns HTTP 409 with the reason. Without a live lead, the dialog explains why and sends nothing. The orchestrator creates the language; the server makes no model call for it. `POST /api/languages/request` uses the usual Host, Origin, `X-Crew` and `confirmed` checks, and logs the request in `.herdr-crew/actions.log`.
 
-Project languages live at `<project>/.herdr-crew/locales/<code>.json`, inside the state directory, which is usually in `.gitignore`. They cannot replace `en` or `nl` and do not change the herdr-crew checkout. To share a language with every project, add it to `locales/` in the checkout through a pull request. A running dashboard picks up a new or updated project language on the next request, without a restart.
+Project languages live at `<project>/.herdr-crew-locales/<code>.json`, next to `.herdr-crew.json`, so you can commit them and colleagues get them too. Set `localesDir` in `.herdr-crew.json` to another folder inside the project if you prefer; a path outside the project is ignored, and a running dashboard needs a restart to read a changed `localesDir`. Languages added earlier in `<project>/.herdr-crew/locales/` still load; the new folder wins when both have the same code. Project languages cannot replace `en` or `nl` and do not change the herdr-crew checkout. To share a language with every project, add it to `locales/` in the checkout through a pull request. A running dashboard picks up a new or updated project language on the next request, without a restart.
 
 ```sh
 herdr-crew locale list [--project DIR]

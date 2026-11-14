@@ -61,7 +61,7 @@ The task modal renders `backlog task view <id> --json` (schemaVersion 1) with a 
 `lib/project-file.mjs`: the real path rule for project files, shared by the links and markdown widgets.
 `lib/i18n.mjs`: locale files from `locales/` (`en.json` is the reference and fallback), `checkLocale` for keys, placeholders and empty texts, and the translator used by the server and the widgets.
 `locales/en.json`, `locales/nl.json`: every text of the page and the server.
-`lib/languages.mjs`: project languages in `<project>/.herdr-crew/locales/`, `locale check` and `locale add`, and the Add language message to the lead.
+`lib/languages.mjs`: project languages in `<project>/.herdr-crew-locales/` (or `localesDir`, with `.herdr-crew/locales/` still read), `locale check` and `locale add`, and the Add language message to the lead.
 `lib/agents.mjs`: close and reopen of agents from the dashboard (Herdr tab close, tab create and agent start with the stored OpenCode session), with the cwd rule for the project and its git worktrees.
 `lib/panels.mjs`: the built-in panel types, entry validation for `widget add` and `widget remove`, and the message template that the Add panel button sends to the lead.
 `lib/widget-options.mjs`: shared option checks for the built-in widgets.

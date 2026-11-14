@@ -14,7 +14,7 @@ import { promptWhenReady } from "./lib/send.mjs";
 import { createOnboarding, registerPersona } from "./lib/onboarding.mjs";
 import { generateTheme, generateAvatars, imageEndpoint, flavourTheme } from "./lib/theme.mjs";
 import { i18n, tr } from "./lib/i18n.mjs";
-import { projectLocaleDir, checkLocaleFile, addLocale, languageRequestText, EN_FILE } from "./lib/languages.mjs";
+import { projectLocaleDirs, localesDirProblem, checkLocaleFile, addLocale, languageRequestText, EN_FILE } from "./lib/languages.mjs";
 import { modelEndpoint } from "./lib/summary.mjs";
 import { buildConfig } from "./lib/init.mjs";
 import { renderMarkdown, markdownPage } from "./lib/markdown.mjs";
@@ -55,7 +55,7 @@ Usage:
   herdr-crew locale check <file>
   herdr-crew locale add <code> --file <file> [--project DIR]
       Lists, checks or adds a dashboard language. A file must have the keys and placeholders of locales/en.json;
-      add stores it in <project>/.herdr-crew/locales/<code>.json.
+      add stores it in <project>/.herdr-crew-locales/<code>.json, or in localesDir from .herdr-crew.json.
   herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
       Waits until the agent is idle or done and its input box is empty, then sends the prompt.
       Exit 0 sent, 2 timeout (default 100000 ms), 1 other errors.
@@ -153,9 +153,15 @@ if (command === "widget") {
 
 if (command === "locale") {
   const [sub, arg] = args._;
-  i18n.addDir(projectLocaleDir(project));
+  const lcfg = existsSync(join(project, CONFIG_FILE)) ? await loadConfig(project) : {};
+  const dirs = projectLocaleDirs(project, lcfg);
+  for (const d of dirs) i18n.addDir(d);
+  if (localesDirProblem(lcfg.localesDir)) console.error(`[herdr-crew] localesDir ignored: ${localesDirProblem(lcfg.localesDir)}; using ${dirs[0]}`);
   if (sub === "list") {
-    for (const l of i18n.languages()) console.log(`${l.code}\t${l.name}\t${l.englishName}\t${l.project ? projectLocaleDir(project) : "built-in"}`);
+    for (const l of i18n.languages()) {
+      const from = l.project ? dirs.find((d) => existsSync(join(d, `${l.code}.json`))) : "built-in";
+      console.log(`${l.code}\t${l.name}\t${l.englishName}\t${from}`);
+    }
     process.exit(0);
   }
   if (sub === "check" && arg) {
@@ -172,7 +178,7 @@ if (command === "locale") {
       console.error(`No ${CONFIG_FILE} in ${project}; run herdr-crew init first.`);
       process.exit(1);
     }
-    const r = await addLocale({ project, code: arg, file: resolve(args.file) });
+    const r = await addLocale({ project, code: arg, file: resolve(args.file), dir: dirs[0] });
     if (r.errors) {
       console.error(`Language not added:\n- ${r.errors.slice(0, 50).join("\n- ")}${r.errors.length > 50 ? `\n- and ${r.errors.length - 50} more` : ""}`);
       process.exit(1);
@@ -234,7 +240,8 @@ const cfg = await loadConfig(project);
 if (!cfg.exists) console.log(`No ${CONFIG_FILE} in ${project}; running with defaults. Try: herdr-crew init`);
 const PORT = Number(args.port ?? process.env.PORT ?? cfg.port);
 const stateDir = await makeStateDir(project);
-i18n.addDir(projectLocaleDir(project));
+for (const d of projectLocaleDirs(project, cfg)) i18n.addDir(d);
+if (localesDirProblem(cfg.localesDir)) console.log(`[herdr-crew] localesDir ignored: ${localesDirProblem(cfg.localesDir)}`);
 const say = (s) => console.log(`[herdr-crew] ${s}`);
 
 // Theme: --reset-theme, --theme "text", --theme (ask), or ask once on the first interactive start.
