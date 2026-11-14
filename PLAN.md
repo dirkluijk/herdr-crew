@@ -67,7 +67,7 @@ The task modal renders `backlog task view <id> --json` (schemaVersion 1) with a 
 `lib/widget-options.mjs`: shared option checks for the built-in widgets.
 `widgets/dev-server.mjs`, `widgets/links.mjs`, `widgets/backlog.mjs` and `widgets/markdown.mjs`: built-in widgets; each exports `validate(options)`.
 `skills/herdr-crew/SKILL.md`: agent skill, with `skills/herdr-crew/crew.mjs` as launcher.
-`README.md`: user documentation.
+`README.md`: short user documentation. `DESIGN.md`: architecture and the full reference.
 `backlog/`: this project's Backlog.md data, using the `CREW` prefix.
 `test/`: `node:test` suites for screen parsing, markdown, init, onboarding, theme, live updates, and HTTP guards, with stub `herdr`, `backlog`, and `open` commands in `test/fixtures/bin`.
 
