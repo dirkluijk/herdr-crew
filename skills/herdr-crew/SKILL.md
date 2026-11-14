@@ -17,7 +17,7 @@ The launcher needs the skill installed as a symlink to `skills/herdr-crew` in th
 
 Use this when the user asks for a new Herdr crew (for example "maak een nieuwe Herdr crew" or "make a new Herdr crew") or runs `/crew`. The dashboard must run before any other agent starts, so the user sees every next step happen. Do not start milestone agents in this flow.
 
-1. **Check.** Run `test "${HERDR_ENV:-}" = 1`; if it fails, tell the user to start OpenCode inside Herdr and stop. Run `node <base>/crew.mjs doctor --short`. Stop on a `missing` line and show its hint; mention warnings in one sentence and go on. Read `herdr agent list` for the agent names in use on the Herdr server, and check whether the project already has a `.herdr-crew.json`.
+1. **Check.** Run `test "${HERDR_ENV:-}" = 1`; if it fails, tell the user to start OpenCode inside Herdr and stop. Run `node <base>/crew.mjs doctor --short`. Stop only when Node or Herdr is `missing`, and show its hint. Mention other problems, such as links, in one sentence and go on: this skill is loaded, so the crew can start, and never run `install` without the user asking for it. Read `herdr agent list` for the agent names in use on the Herdr server, and check whether the project already has a `.herdr-crew.json`.
 2. **Ask once.** Ask everything in one round with the question tool, each with a recommended default first:
    - Project directory: default the current directory.
    - Orchestrator agent name: default `<directory name>-orch`, lowercase, matching `[a-z][a-z0-9_-]{0,31}` and not used by a live agent in `herdr agent list`.
