@@ -767,3 +767,35 @@ test("languages: locale add makes a new language selectable without restart, the
   const { language, bubbleLanguage, ...rest } = JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8"));
   await writeFile(join(project, ".herdr-crew.json"), JSON.stringify({ ...rest, personas: cfg.personas }));
 });
+
+test("other projects: agents outside the project are shown with only Go to, own unregistered agents can be closed", async () => {
+  await mkdir(join(root, "other"), { recursive: true });
+  await herdrState({ extraAgents: [
+    { name: "x-other", pane_id: "w99:p7", tab_id: "w99:t7", workspace_id: "w99", agent: "opencode", agent_status: "idle", cwd: join(root, "other"), agent_session: { value: "ses_other1" } },
+    { name: "x-own", pane_id: "w99:p8", tab_id: "w99:t8", workspace_id: "w99", agent: "opencode", agent_status: "idle", cwd: join(project, "docs"), agent_session: { value: "ses_own1" } },
+  ] });
+  let snap;
+  assert.ok(await until(async () => (snap = JSON.parse((await api("/api/agents")).text)).agents.some((a) => a.id === "x-own")));
+  const other = snap.agents.find((a) => a.id === "x-other");
+  const own = snap.agents.find((a) => a.id === "x-own");
+  assert.deepEqual([other.otherProject, other.canClose, other.isNew], [true, false, false]);
+  assert.deepEqual([own.otherProject, own.canClose, own.isNew], [false, true, true]);
+  assert.ok(await until(async () => JSON.parse((await api("/api/agents")).text).agents.find((a) => a.id === "m9-probe").canClose));
+
+  const post = (id, action, body = { confirmed: true }) => api(`/api/agents/${id}/${action}`, { method: "POST", headers: ok(), body });
+  const before = (await closeCalls()).length;
+  for (const [action, body] of [["close", { confirmed: true }], ["prompt", { text: "hi" }], ["register", { confirmed: true, name: "X" }], ["onboard", { confirmed: true }]]) {
+    const r = await post("x-other", action, body);
+    assert.equal(r.status, 409, action);
+    assert.match(r.text, /another project/, action);
+  }
+  assert.equal((await post("x-other", "focus", {})).status, 200);
+  assert.equal((await closeCalls()).length, before);
+  assert.ok(!JSON.parse(await readFile(join(project, ".herdr-crew.json"), "utf8")).personas.some((p) => p.agent === "x-other"));
+
+  const r = await post("x-own", "close");
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual(JSON.parse(r.text), { ok: true, stored: false });
+  assert.deepEqual((await closeCalls()).at(-1), ["tab", "close", "w99:t8"]);
+  await herdrState({});
+});

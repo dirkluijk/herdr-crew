@@ -184,7 +184,7 @@ herdr-crew widget add --project . --json '{"module":"markdown","options":{"id":"
 
 ## Close and reopen agents
 
-Live idle or done agent cards have a ⏻ Close button. The lead persona has no Close button. After confirmation, the server checks `herdr agent get` again for the same pane and agent name, with status idle or done. It uses `herdr tab get` to require exactly one pane in the tab, so it cannot close a tab that also holds the dashboard or another pane. It then runs `herdr tab close`. OpenCode stops, but its session stays on disk.
+Live idle or done agent cards have a ⏻ Close button. The lead persona has no Close button. After confirmation, the server checks `herdr agent get` again for the same pane and agent name, with status idle or done. It uses `herdr tab get` to require exactly one pane in the tab, so it cannot close a tab that also holds the dashboard or another pane. It then runs `herdr tab close`. OpenCode stops, but its session stays on disk. Close only works for agents whose cwd (from Herdr) is the project, inside it, or in one of its git worktrees, the same rule as Reopen. Unregistered agents of the project can be closed too. Agents of another project in the same Herdr workspace show an other project badge and only Go to; the server refuses their other actions with 409.
 
 For an OpenCode agent with a persona in `.herdr-crew.json`, Close saves the Herdr `agent_session.value` (`ses_` ID) and the agent's cwd as `session` and `cwd`. Both fields are optional, so older configs still work. The closed card shows the session's last words. An agent without a persona can be closed, but nothing is saved and it cannot be reopened from the dashboard.
 

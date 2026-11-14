@@ -23,7 +23,7 @@ if (group === "agent" && cmd === "list") {
   const screen = process.env.HERDR_CREW_TEST_SCREEN;
   out({ text: screen && existsSync(screen) ? readFileSync(screen, "utf8") : "" });
 } else if (group === "agent" && cmd === "get") {
-  out({ agent: probe, type: "agent_info" });
+  out({ agent: (state.extraAgents ?? []).find((a) => a.pane_id === args[2]) ?? probe, type: "agent_info" });
 } else if (group === "tab" && cmd === "get") {
   out({ tab: { tab_id: args[2], label: "m9-probe (Probe, it)", pane_count: state.panes ?? 1, workspace_id: "w99" } });
 } else if (group === "tab" && cmd === "create") {

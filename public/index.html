@@ -353,7 +353,8 @@ function card(a) {
     a.lead ? `<span class="crown">${h("ui.orchestrator")}</span>` : "",
     a.mascot ? `<span class="crown">${h("ui.mascot")}</span>` : "",
     a.isNew ? `<span class="tag">${esc(tx("ui.newTag"))}</span>` : "",
-    a.live && !a.registered ? `<span class="tag" style="background:var(--done)">${esc(tx("ui.unregistered"))}</span>` : "",
+    a.otherProject ? `<span class="tag" style="background:var(--closed)" title="${h("ui.otherProjectTitle")}">${h("ui.otherProject")}</span>`
+      : a.live && !a.registered ? `<span class="tag" style="background:var(--done)">${esc(tx("ui.unregistered"))}</span>` : "",
   ].join("");
   const pinned = layout.pinned.includes(a.id);
   const tools = a.lead ? "" : `<div class="tools">
@@ -374,7 +375,7 @@ function card(a) {
       ${a.live ? usageBar(a.usage) : ""}
     </div>
     <div class="conv">${conversation(a, bubble)}</div>
-    ${a.live ? chatBox(a, st) : ""}
+    ${a.live && !a.otherProject ? chatBox(a, st) : ""}
     ${a.live ? actionsRow(a, st) : a.canReopen ? `<div class="actions"><button data-act="reopen" data-id="${esc(a.id)}">${h("ui.reopenBtn")}</button></div>` : ""}
     <div class="meta">${act}<span>${byTag(a)}<span data-ago="${esc(a.since ?? "")}">${esc(ago(a.since))}</span></span></div>
   </div>`;
@@ -459,12 +460,13 @@ document.addEventListener("keydown", (ev) => {
 
 function actionsRow(a, st) {
   const id = esc(a.id);
+  if (a.otherProject) return `<div class="actions"><button data-act="focus" data-id="${id}">${h("ui.goTo")}</button></div>`;
   return `<div class="actions">
     <button data-act="focus" data-id="${id}">${h("ui.goTo")}</button>
     ${!a.lead && !a.mascot && (a.isNew || !a.registered) ? `<button data-act="onboard" data-id="${id}" class="welcome">${h("ui.inform")}</button>` : ""}
     ${!a.registered ? `<button data-act="register" data-id="${id}">${h("ui.register")}</button>` : ""}
     ${st === "blocked" ? `<button data-act="answer" data-id="${id}" class="urgent">${h("ui.answer")}</button>` : ""}
-    ${!a.lead && (st === "idle" || st === "done") ? `<button data-act="close" data-id="${id}">${h("ui.closeBtn")}</button>` : ""}
+    ${a.canClose ? `<button data-act="close" data-id="${id}">${h("ui.closeBtn")}</button>` : ""}
   </div>`;
 }
 

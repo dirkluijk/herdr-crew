@@ -27,6 +27,8 @@
   "ui.legend": "geen sessie, wel een legende",
   "ui.newTag": "nieuw",
   "ui.unregistered": "niet geregistreerd",
+  "ui.otherProject": "ander project",
+  "ui.otherProjectTitle": "Werkt buiten dit project en zijn git-worktrees. Hier werkt alleen Ga naar; het dashboard van dat project heeft de andere acties.",
   "ui.informed": "geïnformeerd",
   "ui.informedViaOrchestrator": "geïnformeerd via de orchestrator",
   "ui.by.self": "✍️ eigen woorden",

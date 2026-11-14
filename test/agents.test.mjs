@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from "node:fs/promis
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createAgentControl, allowedCwd, labelFor } from "../lib/agents.mjs";
+import { createAgentControl, allowedCwd, labelFor, inRoots } from "../lib/agents.mjs";
 
 let root, project, worktree, file;
 before(async () => {
@@ -67,6 +67,8 @@ test("close: refused for the lead, busy agents, other panes and more than one pa
   const cases = [
     [{ ...card, lead: true }, {}, /lead persona/],
     [card, { "herdr agent get": agentInfo({ agent_status: "working" }) }, /working; only idle or done/],
+    [card, { "herdr agent get": agentInfo({ cwd: "/" }), "git ": { fail: "no" } }, /outside this project; only agents of this project/],
+    [card, { "herdr agent get": agentInfo({ cwd: undefined }) }, /unknown folder/],
     [card, { "herdr agent get": agentInfo({ agent_status: "blocked" }) }, /blocked/],
     [card, { "herdr agent get": agentInfo({ pane_id: "w1:p5" }) }, /no longer in that pane/],
     [card, { "herdr agent get": agentInfo({ name: "other" }) }, /no longer in that pane/],
@@ -187,4 +189,14 @@ test("allowedCwd: the project, inside it, or a git worktree of it", async () => 
   assert.equal(await allowedCwd(exec, project, `${project}-wt2`), null);
   const noGit = async () => ({ ok: false, stdout: "", stderr: "" });
   assert.equal(await allowedCwd(noGit, project, join(worktree, "src")), null);
+});
+
+test("inRoots: real existing directories inside one of the roots", () => {
+  const roots = [project, worktree];
+  assert.equal(inRoots(roots, join(project, "sub")), join(project, "sub"));
+  assert.equal(inRoots(roots, worktree), worktree);
+  assert.equal(inRoots(roots, join(project, "escape")), null);
+  assert.equal(inRoots(roots, join(project, "nope")), null);
+  assert.equal(inRoots(roots, undefined), null);
+  assert.equal(inRoots(roots, `${project}x`), null);
 });

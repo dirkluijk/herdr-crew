@@ -27,6 +27,8 @@
   "ui.legend": "no session, still a legend",
   "ui.newTag": "new",
   "ui.unregistered": "not registered",
+  "ui.otherProject": "other project",
+  "ui.otherProjectTitle": "Works outside this project and its git worktrees. Only Go to works here; the dashboard of that project has the other actions.",
   "ui.informed": "informed",
   "ui.informedViaOrchestrator": "informed via the orchestrator",
   "ui.by.self": "✍️ own words",
