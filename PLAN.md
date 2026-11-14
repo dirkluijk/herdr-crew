@@ -24,7 +24,7 @@ The older dashboard is still in `other-project/dashboard/` on port `5180`.
 Pixel built that project-specific dashboard; it is not maintained here.
 The skill is installed as a symlink: `~/.config/opencode/skills/herdr-crew` points to `skills/herdr-crew` in this checkout, so skill changes are live without copying.
 Agents run the CLI through `node <skill base directory>/crew.mjs`, a launcher that reaches `server.mjs` through the symlink; it needs the symlink install and does not work under `node --preserve-symlinks-main`.
-The installed herdr-orchestrator skill has Prerequisites step 4 to load the herdr-crew skill when a project has `.herdr-crew.json`, a crew line in the briefing template, and uses the herdr-crew send command for reports, briefings, and follow-up work when herdr-crew is in use.
+The herdr-orchestrator skill and the orchestrate command live in this repo (`skills/herdr-orchestrator`, `commands/`) and are installed as symlinks with `node server.mjs install` (done on 2026-11-14 with --force; the old copies are in `~/.config/opencode/herdr-crew-backup/`). The orchestrator skill has Prerequisites step 4 to load the herdr-crew skill when a project has `.herdr-crew.json`, a crew line in the briefing template, and uses the herdr-crew send command for reports, briefings, and follow-up work when herdr-crew is in use.
 Milestone agent `x-crewkit` (persona Rosa) built this under orchestrator Vera in the other-project workspace.
 This repo has its own crew: orchestrator `crew-orch` (persona Noor) in Herdr workspace `w2G`, config `.herdr-crew.json`, avatars in `avatars/`.
 Its dashboard runs at http://localhost:5192 (files origin 5193) in Herdr pane `w2G:p4`.

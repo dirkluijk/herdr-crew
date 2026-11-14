@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@m6-release'
 created_date: '2026-11-14 12:58'
-updated_date: '2026-11-14 13:05'
+updated_date: '2026-11-14 13:07'
 labels:
   - skill
   - release
@@ -48,4 +48,6 @@ Branch feat/release, commit 5ad2e9c.
 - Validation: node --test test/install.test.mjs 11 pass (temp config dirs, HOME and XDG_CONFIG_HOME also in temp, stub binaries), npm test 184 pass, npm run check ok, manual install/--force/uninstall run against a temp config dir.
 
 crew-orch 2026-11-14: rebased, npm test 186 pass, fast-forward merged as 4c22702 and pushed. doctor on the real machine: 10 ok, 2 warnings (installed herdr-orchestrator skill and orchestrate command are real copies); install --dry-run shows the plan, nothing changed. Switching the user's copies to symlinks waits for the user's go.
+
+crew-orch 2026-11-14: with the user's go ran install --force --yes on the real config: commands/orchestrate.md and skills/herdr-orchestrator moved to ~/.config/opencode/herdr-crew-backup/2026-11-14T13-07-07-444Z and replaced by symlinks; doctor 12 ok.
 <!-- SECTION:NOTES:END -->
