@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@m6-release'
 created_date: '2026-11-14 12:58'
-updated_date: '2026-11-14 13:03'
+updated_date: '2026-11-14 13:05'
 labels:
   - skill
   - release
@@ -46,4 +46,6 @@ Branch feat/release, commit 5ad2e9c.
 - doctor: Node 22+, herdr --version plus help text checks for agent read --format and pane report-metadata --token, HERDR_ENV, opencode --version, backlog --version plus task list --help for --json and --watch, model and image credentials (optional), and each link. Prints ok, warning or missing with a hint; exit 1 when something is missing. Only --version and --help calls.
 - For the user's own machine (doctor run read only on the real config): skills/herdr-crew links to the main checkout, skills/herdr-orchestrator and commands/orchestrate.md are real files, so install there needs --force (backup) after the explicit go, as planned.
 - Validation: node --test test/install.test.mjs 11 pass (temp config dirs, HOME and XDG_CONFIG_HOME also in temp, stub binaries), npm test 184 pass, npm run check ok, manual install/--force/uninstall run against a temp config dir.
+
+crew-orch 2026-11-14: rebased, npm test 186 pass, fast-forward merged as 4c22702 and pushed. doctor on the real machine: 10 ok, 2 warnings (installed herdr-orchestrator skill and orchestrate command are real copies); install --dry-run shows the plan, nothing changed. Switching the user's copies to symlinks waits for the user's go.
 <!-- SECTION:NOTES:END -->
