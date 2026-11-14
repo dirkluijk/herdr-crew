@@ -49,7 +49,7 @@ test("opencodeConfigDir: OPENCODE_CONFIG_DIR, then XDG_CONFIG_HOME, then ~/.conf
 test("the plan covers both skills and the shipped commands", async () => {
   const plan = await installPlan({ app: APP, dir: join(root, "nothing") });
   const rels = plan.map((p) => p.rel);
-  for (const r of ["skills/herdr-crew", "skills/herdr-orchestrator", "commands/orchestrate.md"]) assert.ok(rels.includes(r), r);
+  for (const r of ["skills/herdr-crew", "skills/herdr-orchestrator", "commands/orchestrate.md", "commands/crew.md"]) assert.ok(rels.includes(r), r);
   assert.ok(plan.every((p) => p.state === "create"));
 });
 
@@ -117,7 +117,7 @@ test("uninstall removes only links into this checkout", async () => {
   await symlink(join(root, "other-skill"), join(dir, "skills", "other"));
   await writeFile(join(dir, "commands", "mine.md"), "keep");
   await symlink(join(APP, "commands", "gone.md"), join(dir, "commands", "gone.md"));
-  assert.equal((await uninstallPlan({ app: APP, dir })).length, 4);
+  assert.equal((await uninstallPlan({ app: APP, dir })).length, (await installPlan({ app: APP, dir })).length + 1);
 
   const unconfirmed = await cli(["uninstall"], { dir });
   assert.equal(unconfirmed.code, 1);

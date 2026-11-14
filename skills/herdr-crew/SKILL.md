@@ -1,17 +1,60 @@
 ---
 name: herdr-crew
-description: Crew conventions for projects with several coding agents in Herdr and a herdr-crew dashboard. Use when you run as an agent in Herdr in a project with a .herdr-crew.json, when you start or brief other agents as orchestrator, when you set up or run the herdr-crew dashboard for a project, when you register a persona, or when the dashboard asks you to add a panel or a language.
+description: Crew conventions for projects with several coding agents in Herdr and a herdr-crew dashboard. Use when you run as an agent in Herdr in a project with a .herdr-crew.json, when you start or brief other agents as orchestrator, when you set up or run the herdr-crew dashboard for a project, when you register a persona, or when the dashboard asks you to add a panel or a language. Also use it to start a new crew: when the user says "make a new Herdr crew", "maak een nieuwe Herdr crew" or something close to it in any language, or runs the /crew command.
 ---
 
 # herdr-crew
 
-Check that `HERDR_ENV=1` and that the project or its parent contains `.herdr-crew.json`. If either check fails, these conventions do not apply.
+Check that `HERDR_ENV=1` and that the project or its parent contains `.herdr-crew.json`. If either check fails, these conventions do not apply. The exception is the New crew section below, which creates that file.
 
 ## The herdr-crew command
 
 Run herdr-crew through the launcher in this skill's directory: `node <base>/crew.mjs <command>`, where `<base>` is the path after "Base directory for this skill" in the skill tool output. The commands below write it as `node <base>/crew.mjs`; fill in the real path. `node <base>/crew.mjs help` lists all commands.
 
 The launcher needs the skill installed as a symlink to `skills/herdr-crew` in the herdr-crew checkout; `node server.mjs install` in the checkout creates it, and `node server.mjs doctor` checks it. It does not work with `node --preserve-symlinks-main`. With a copy it cannot find the checkout; use `node <checkout>/server.mjs` instead, or the `HERDR_CREW_CLI` value if the dashboard shows one.
+
+## New crew
+
+Use this when the user asks for a new Herdr crew (for example "maak een nieuwe Herdr crew" or "make a new Herdr crew") or runs `/crew`. The dashboard must run before any other agent starts, so the user sees every next step happen. Do not start milestone agents in this flow.
+
+1. **Check.** Run `test "${HERDR_ENV:-}" = 1`; if it fails, tell the user to start OpenCode inside Herdr and stop. Run `node <base>/crew.mjs doctor --short`. Stop on a `missing` line and show its hint; mention warnings in one sentence and go on. Read `herdr agent list` for the agent names in use on the Herdr server, and check whether the project already has a `.herdr-crew.json`.
+2. **Ask once.** Ask everything in one round with the question tool, each with a recommended default first:
+   - Project directory: default the current directory.
+   - Orchestrator agent name: default `<directory name>-orch`, lowercase, matching `[a-z][a-z0-9_-]{0,31}` and not used by a live agent in `herdr agent list`.
+   - Orchestrator persona: name and pronouns, for example `Vera, she/her`.
+   - Dashboard language and bubble language: for example both Dutch, both English, or English dashboard with Dutch bubbles.
+   - Theme: the default theme, or a free text description such as "a cosy bakery".
+   - Avatar directory: default `avatars`, or none.
+   - Port: default `auto` (the first free pair from 5190: dashboard and files port), or a number.
+   - Add `.herdr-crew/` to `.gitignore`: yes (recommended) or no.
+   - Only when `.herdr-crew.json` exists: overwrite it, or keep it and only start the dashboard.
+
+   When an answer is invalid (a taken or malformed agent name, a directory that does not exist), ask only that question again. Create a missing project directory only when the user confirms.
+3. **Write the config** without questions. Skip this step when the user kept an existing config.
+
+   ```sh
+   node <base>/crew.mjs init --project <dir> --orchestrator <agent> --persona-name <Name> --pronouns <p> \
+     --language <code> --bubble-language <code> --theme "<text or default>" --avatars <dir> --port auto [--force]
+   ```
+
+   Leave out `--avatars` for none. A theme text is generated here when model credentials are set; without them `init` keeps the default theme and says so. `init` prints the port and the dashboard URL. Add `.herdr-crew/` to `.gitignore` when the user said yes.
+4. **Name yourself** after the persona, so your card is live from the first poll:
+
+   ```sh
+   herdr agent rename "$HERDR_PANE_ID" <agent>
+   herdr tab rename "$HERDR_TAB_ID" "<agent> (<Name>, <pronouns>)"
+   ```
+
+5. **Start the dashboard** in a split pane without focus. `--no-prompt` keeps the server from asking anything in that pane, and `--open` opens the URL in the browser (`open` on macOS, `xdg-open` on Linux) once it listens:
+
+   ```sh
+   herdr pane split --current --direction down --cwd <dir> --no-focus
+   herdr pane run <new-pane-id> "node <base>/crew.mjs --project <dir> --no-prompt --open"
+   ```
+
+   Read the pane ID from `.result.pane.pane_id`. Then read the pane (`herdr pane read <new-pane-id> --source recent-unwrapped --lines 20`) once a second, up to 15 times, until the line `crew dashboard for ... on http://localhost:<port>` shows. Give the user that URL. If the server stopped with an error instead (for example a port in use), show the error and ask how to continue. Note the pane ID and URL in the plan or in a Backlog.md task; if the project has neither, tell the user.
+6. **Portrait (optional).** When you have an image tool, make your own portrait as described under Avatars and link it with `register <agent> --project <dir> --avatar <first-name>`. Skip it without an image tool or without an avatar directory.
+7. **Continue as orchestrator.** Load the `herdr-orchestrator` skill and follow its Orchestrator section. You already have your name: keep the tab label `<agent> (<Name>, <pronouns>)` instead of renaming the tab to the bare agent name. Ask the user about the plan and milestones before you start any milestone agent.
 
 ## Your bubble
 

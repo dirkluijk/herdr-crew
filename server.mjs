@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // herdr-crew: a crew dashboard for any project with Herdr agents. Reads Herdr read only; actions only on a click.
 import { createServer } from "node:http";
-import { readFile, writeFile, stat } from "node:fs/promises";
+import { readFile, writeFile, stat, mkdir } from "node:fs/promises";
 import { existsSync, realpathSync } from "node:fs";
 import { join, dirname, resolve, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +16,7 @@ import { generateTheme, generateAvatars, imageEndpoint, flavourTheme } from "./l
 import { i18n, tr } from "./lib/i18n.mjs";
 import { projectLocaleDirs, localesDirProblem, checkLocaleFile, addLocale, languageRequestText, EN_FILE } from "./lib/languages.mjs";
 import { modelEndpoint } from "./lib/summary.mjs";
-import { buildConfig } from "./lib/init.mjs";
+import { buildConfig, leadPersona, firstFreePort, portFree, DEFAULT_PORT } from "./lib/init.mjs";
 import { renderMarkdown, markdownPage } from "./lib/markdown.mjs";
 import { createHub, createScheduler } from "./lib/live.mjs";
 import { createWidgetSet, removeEntry, removeConfirm } from "./lib/widgets.mjs";
@@ -44,8 +44,15 @@ function parseArgs(argv) {
 const HELP = `herdr-crew ${VERSION}
 
 Usage:
-  herdr-crew [serve] [--project DIR] [--port N] [--theme ["free text"]] [--reset-theme] [--theme-avatars] [--no-prompt]
-  herdr-crew init [--project DIR] [--plan PLAN.md] [--import personas.json] [--avatars DIR] [--language nl|en] [--port N] [--force]
+  herdr-crew [serve] [--project DIR] [--port N] [--theme ["free text"]] [--reset-theme] [--theme-avatars] [--no-prompt] [--open]
+      --open opens the dashboard in the browser once it listens (open on macOS, xdg-open elsewhere).
+  herdr-crew init [--project DIR] [--plan PLAN.md] [--import personas.json] [--avatars DIR] [--language CODE]
+                 [--bubble-language CODE] [--port N|auto] [--title T] [--theme "free text"|default] [--force]
+                 [--orchestrator AGENT --persona-name NAME [--pronouns P] [--role ROLE] [--prefixes "A,B"]]
+      Writes .herdr-crew.json without asking anything. --orchestrator adds the lead persona, with message prefixes
+      "NAME here." (plus "NAME hier." for Dutch), and skips personas from live tab labels. --port auto takes the
+      first free pair from 5190 (dashboard and files port). --theme generates the theme now (with model
+      credentials) and stops the server from asking for one; "default" keeps the default theme.
   herdr-crew register <agent> --name NAME [--pronouns P] [--role ROLE] [--avatar KEY] [--project DIR]
   herdr-crew widget add --json '<entry>' [--project DIR]
   herdr-crew widget remove <id> [--project DIR]
@@ -65,8 +72,9 @@ Usage:
       Never replaces a real file or another link; --force moves it to <config dir>/herdr-crew-backup/ first.
   herdr-crew uninstall [--yes] [--dry-run] [--config-dir DIR]
       Removes only the links in skills/ and commands/ that point into this checkout.
-  herdr-crew doctor [--config-dir DIR]
+  herdr-crew doctor [--config-dir DIR] [--short]
       Read-only check of Node, Herdr, OpenCode, Backlog.md, credentials and the links. Exit 1 when something is missing.
+      --short prints only what is not ok, plus the totals.
 
 Config: <project>/${CONFIG_FILE}. State (memory, actions.log, theme avatars): <project>/.herdr-crew/.
 Model features (lead summary, prompted theme) use ANTHROPIC_FOUNDRY_* or ANTHROPIC_API_KEY;
@@ -87,13 +95,56 @@ if (command === "init") {
     console.error(`${file} exists; use --force to overwrite`);
     process.exit(1);
   }
+  const fail = (msg) => { console.error(msg); process.exit(1); };
+  const str = (k) => (typeof args[k] === "string" ? args[k] : undefined);
+  for (const k of ["orchestrator", "persona-name", "name", "pronouns", "role", "prefixes", "language", "bubble-language", "port", "avatars", "theme", "title"]) {
+    if (args[k] === true) fail(`--${k} needs a value`);
+  }
+  let port;
+  if (args.port === "auto") {
+    port = await firstFreePort();
+    if (!port) fail(`No free port pair from ${DEFAULT_PORT}; pass --port N.`);
+  } else if (args.port !== undefined) {
+    port = Number(args.port);
+    if (!Number.isInteger(port) || port < 1024 || port > 65534) fail("--port must be auto or a number from 1024 to 65534");
+    if (!(await portFree(port)) || !(await portFree(port + 1))) console.error(`Note: port ${port} or ${port + 1} is in use right now.`);
+  }
+  const language = str("language");
+  let lead = null;
+  if (args.orchestrator !== undefined) {
+    try {
+      lead = leadPersona({
+        agent: str("orchestrator"), name: str("persona-name") ?? str("name"), pronouns: str("pronouns"), role: str("role"), language: str("bubble-language") ?? language,
+        prefixes: str("prefixes")?.split(",").map((s) => s.trim()).filter(Boolean),
+      });
+    } catch (e) { fail(e.message); }
+  }
+  if (str("avatars")) await mkdir(resolve(project, str("avatars")), { recursive: true });
   const plan = args.plan ? resolve(project, args.plan) : ["PLAN.md", "AGENTS.md"].map((f) => join(project, f)).find(existsSync);
   const cfg = await buildConfig({
-    project, plan, importFile: args.import ? resolve(project, args.import) : null,
-    avatarDir: args.avatars ?? null, language: args.language, port: args.port ? Number(args.port) : undefined, title: args.title,
+    project, plan, importFile: args.import ? resolve(project, args.import) : null, lead,
+    avatarDir: str("avatars") ?? null, language, bubbleLanguage: str("bubble-language"), port, title: str("title"),
   });
+  // --theme makes the setup non interactive: the server never asks for a theme in its pane afterwards.
+  const themeText = str("theme")?.trim();
+  if (themeText !== undefined) {
+    cfg.themeAsked = true;
+    if (themeText && !/^(default|standaard|none|geen)$/i.test(themeText)) {
+      if (!modelEndpoint()) console.error("No model credentials; keeping the default theme.");
+      else {
+        try {
+          cfg.theme = (await generateTheme({ prompt: themeText.slice(0, 300), language: cfg.language, project: cfg.title, model: cfg.summaries.model })).theme;
+        } catch (e) { console.error(`Theme failed, keeping the default: ${e.message}`); }
+      }
+    }
+  }
   await writeFile(file, JSON.stringify(cfg, null, 2) + "\n");
-  console.log(`Wrote ${file} with ${cfg.personas.length} personas${plan ? ` from ${plan}` : ""}.`);
+  console.log(`Wrote ${file} with ${cfg.personas.length} persona${cfg.personas.length === 1 ? "" : "s"}${plan ? ` from ${plan}` : ""}.`);
+  if (lead) console.log(`Lead: ${lead.agent} (${lead.name}${lead.pronouns ? `, ${lead.pronouns}` : ""}), message prefixes: ${lead.messagePrefixes.join(" | ")}`);
+  if (cfg.theme) console.log(`Theme: ${cfg.theme.name}`);
+  console.log(`Port: ${cfg.port} (files ${cfg.port + 1}), dashboard URL http://localhost:${cfg.port}`);
+  const ignore = existsSync(join(project, ".gitignore")) ? await readFile(join(project, ".gitignore"), "utf8") : "";
+  if (!/^\/?\.herdr-crew\/?\s*$/m.test(ignore)) console.log("Tip: add .herdr-crew/ to .gitignore; it holds local dashboard state.");
   process.exit(0);
 }
 
@@ -231,7 +282,7 @@ if (command === "doctor") {
     app: APP, dir, run: (cmd, a) => exec(cmd, a, process.cwd(), 15000),
     credentials: { model: !!modelEndpoint(), image: !!imageEndpoint() },
   });
-  console.log(formatDoctor(items, { app: APP, dir }));
+  console.log(formatDoctor(items, { app: APP, dir, short: !!args.short }));
   process.exit(items.some((i) => i.status === "missing") ? 1 : 0);
 }
 
@@ -494,7 +545,16 @@ createServer(async (req, res) => {
   }
   res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache" });
   res.end(await readFile(file));
-}).listen(PORT, "127.0.0.1", () => say(`crew dashboard for ${cfg.title} on http://localhost:${PORT}`));
+}).listen(PORT, "127.0.0.1", () => {
+  say(`crew dashboard for ${cfg.title} on http://localhost:${PORT}`);
+  if (args.open) openBrowser(`http://localhost:${PORT}`);
+});
+
+function openBrowser(url) {
+  const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? null : "xdg-open";
+  if (!cmd) return say(`open ${url} in your browser`);
+  exec(cmd, [url], project).then((r) => { if (!r.ok) say(`could not open the browser (${cmd}); open ${url} yourself`); });
+}
 
 // Files origin: a second listener on its own port, so served pages (which may run scripts, like a slide deck)
 // cannot call the dashboard API and keep their own localStorage. Only the files that widgets list right now are
