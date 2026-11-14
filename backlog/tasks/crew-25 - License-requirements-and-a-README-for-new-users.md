@@ -1,11 +1,11 @@
 ---
 id: CREW-25
 title: 'License, requirements and a README for new users'
-status: In Progress
+status: Done
 assignee:
   - '@m6-release'
 created_date: '2026-11-14 12:58'
-updated_date: '2026-11-14 13:37'
+updated_date: '2026-11-14 13:39'
 labels:
   - docs
   - release
@@ -58,4 +58,8 @@ Widened scope done in a1ef6cf (after rebasing onto main for docs/hero.jpg).
 - docs/dashboard.jpg (1440x1345, 246 kB): screenshot of my own dashboard on port 47310 for a fictional cosy-bakery project, with stub herdr, backlog and opencode commands on PATH (fake agents, statuses, bubbles and SHOP tasks), no model credentials, captured with headless Chrome over the DevTools protocol. Personas reuse the existing illustrated avatars (Noor, Pim, Tess, Ruben, Fenna, Daan) with fictional roles. Server stopped and temp files removed afterwards.
 - PLAN.md: only the file list line now points to DESIGN.md. package.json files includes DESIGN.md, LICENSE and docs.
 - npm test 196 pass, npm run check ok.
+
+Pushed feat/release to origin on request (after the rebase onto main the commits are 8802358 and 0e0f720). Not merged.
+
+crew-orch 2026-11-14: reviewed (README 60 lines with hero and a fictional dashboard screenshot, DESIGN.md 311 lines, LICENSE MIT 2026 Dirk Luijk, no dashes, no internal names), rebased, npm test 196 pass, fast-forward merged as 0e0f720; then set the real clone URL in README (377b0e4).
 <!-- SECTION:NOTES:END -->

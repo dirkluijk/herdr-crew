@@ -1,11 +1,11 @@
 ---
 id: CREW-26
 title: 'New crew in one go: questions, then the dashboard runs first'
-status: In Progress
+status: Done
 assignee:
   - '@m6-release'
 created_date: '2026-11-14 12:58'
-updated_date: '2026-11-14 13:27'
+updated_date: '2026-11-14 13:39'
 labels:
   - skill
   - onboarding
