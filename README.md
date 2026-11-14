@@ -31,7 +31,7 @@ You can chat with an agent, jump to it in Herdr with Go to, close and reopen age
 ## 🔧 Install
 
 ```sh
-git clone <repository URL> herdr-crew
+git clone https://github.com/dirkluijk/herdr-crew.git
 cd herdr-crew
 node server.mjs install
 node server.mjs doctor
