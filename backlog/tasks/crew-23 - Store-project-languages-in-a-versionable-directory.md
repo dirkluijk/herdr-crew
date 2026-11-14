@@ -5,10 +5,11 @@ status: To Do
 assignee:
   - '@m5-panels'
 created_date: '2026-11-14 12:57'
+updated_date: '2026-11-14 12:58'
 labels:
   - i18n
 dependencies:
-  - CREW-22
+  - CREW-28
 ordinal: 23000
 ---
 
