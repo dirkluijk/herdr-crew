@@ -11,7 +11,7 @@ Check that `HERDR_ENV=1` and that the project or its parent contains `.herdr-cre
 
 Run herdr-crew through the launcher in this skill's directory: `node <base>/crew.mjs <command>`, where `<base>` is the path after "Base directory for this skill" in the skill tool output. The commands below write it as `node <base>/crew.mjs`; fill in the real path. `node <base>/crew.mjs help` lists all commands.
 
-The launcher needs the skill installed as a symlink to `skills/herdr-crew` in the herdr-crew checkout. It does not work with `node --preserve-symlinks-main`. With a copy it cannot find the checkout; use `node <checkout>/server.mjs` instead, or the `HERDR_CREW_CLI` value if the dashboard shows one.
+The launcher needs the skill installed as a symlink to `skills/herdr-crew` in the herdr-crew checkout; `node server.mjs install` in the checkout creates it, and `node server.mjs doctor` checks it. It does not work with `node --preserve-symlinks-main`. With a copy it cannot find the checkout; use `node <checkout>/server.mjs` instead, or the `HERDR_CREW_CLI` value if the dashboard shows one.
 
 ## Your bubble
 

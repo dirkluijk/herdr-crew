@@ -21,6 +21,8 @@ import { renderMarkdown, markdownPage } from "./lib/markdown.mjs";
 import { createHub, createScheduler } from "./lib/live.mjs";
 import { createWidgetSet, removeEntry, removeConfirm } from "./lib/widgets.mjs";
 import { PANEL_TYPES, addWidget, removeWidget, entryId, panelRequestText } from "./lib/panels.mjs";
+import { opencodeConfigDir, runInstall } from "./lib/install.mjs";
+import { doctor, formatDoctor } from "./lib/doctor.mjs";
 
 const APP = dirname(fileURLToPath(import.meta.url));
 const CLI = `node ${join(APP, "server.mjs")}`;
@@ -57,13 +59,21 @@ Usage:
   herdr-crew send <agent> <text> [--timeout MS] [--interval MS]
       Waits until the agent is idle or done and its input box is empty, then sends the prompt.
       Exit 0 sent, 2 timeout (default 100000 ms), 1 other errors.
+  herdr-crew install [--yes] [--force] [--dry-run] [--config-dir DIR]
+      Links skills/* and commands/*.md of this checkout into the OpenCode config dir (--config-dir, else
+      OPENCODE_CONFIG_DIR, else $XDG_CONFIG_HOME/opencode, else ~/.config/opencode). Shows the plan and asks first.
+      Never replaces a real file or another link; --force moves it to <config dir>/herdr-crew-backup/ first.
+  herdr-crew uninstall [--yes] [--dry-run] [--config-dir DIR]
+      Removes only the links in skills/ and commands/ that point into this checkout.
+  herdr-crew doctor [--config-dir DIR]
+      Read-only check of Node, Herdr, OpenCode, Backlog.md, credentials and the links. Exit 1 when something is missing.
 
 Config: <project>/${CONFIG_FILE}. State (memory, actions.log, theme avatars): <project>/.herdr-crew/.
 Model features (lead summary, prompted theme) use ANTHROPIC_FOUNDRY_* or ANTHROPIC_API_KEY;
 theme avatars use OPENAI_FOUNDRY_* or OPENAI_API_KEY. Without them everything degrades to defaults.`;
 
 const args = parseArgs(process.argv.slice(2));
-const command = ["init", "register", "send", "widget", "locale", "serve", "help"].includes(args._[0]) ? args._.shift() : "serve";
+const command = ["init", "register", "send", "widget", "locale", "install", "uninstall", "doctor", "serve", "help"].includes(args._[0]) ? args._.shift() : "serve";
 const project = resolve(args.project ?? process.cwd());
 
 if (command === "help" || args.help) {
@@ -190,6 +200,33 @@ if (command === "send") {
   if (r.ok) console.log(`Sent to ${agent}.`);
   else console.error(`[herdr-crew] not sent: ${r.reason}`);
   process.exit(r.ok ? 0 : r.timeout ? 2 : 1);
+}
+
+if (command === "install" || command === "uninstall") {
+  const dir = typeof args["config-dir"] === "string" ? resolve(args["config-dir"]) : opencodeConfigDir();
+  const ask = async (question) => {
+    if (!process.stdin.isTTY) {
+      console.error("No terminal to confirm in; run again with --yes.");
+      return false;
+    }
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await rl.question(question);
+    rl.close();
+    return /^y(es)?$/i.test(answer.trim());
+  };
+  process.exit(await runInstall({
+    app: APP, dir, uninstall: command === "uninstall", yes: !!args.yes, force: !!args.force, dryRun: !!args["dry-run"], ask,
+  }));
+}
+
+if (command === "doctor") {
+  const dir = typeof args["config-dir"] === "string" ? resolve(args["config-dir"]) : opencodeConfigDir();
+  const items = await doctor({
+    app: APP, dir, run: (cmd, a) => exec(cmd, a, process.cwd(), 15000),
+    credentials: { model: !!modelEndpoint(), image: !!imageEndpoint() },
+  });
+  console.log(formatDoctor(items, { app: APP, dir }));
+  process.exit(items.some((i) => i.status === "missing") ? 1 : 0);
 }
 
 // serve
