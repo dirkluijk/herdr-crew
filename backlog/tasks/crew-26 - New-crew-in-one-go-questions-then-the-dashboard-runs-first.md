@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@m6-release'
 created_date: '2026-11-14 12:58'
-updated_date: '2026-11-14 13:19'
+updated_date: '2026-11-14 13:27'
 labels:
   - skill
   - onboarding
@@ -47,4 +47,6 @@ Branch feat/release, commits b326ca9 and f4bf432.
 - Found during the run and fixed in f4bf432: (1) doctor reported the commands/crew.md link as missing in the global config, and the first skill text stopped on any missing line; now only Node or Herdr stop the flow. (2) /reload in an OpenCode session restarts the shared OpenCode service and interrupts every session on the machine (it interrupted this agent too). The install and uninstall messages no longer suggest /reload; they say new sessions pick the change up. Worth knowing for orchestrators: never send /reload to an agent.
 - The browser open itself is covered by the test with stub open and xdg-open; in the end to end run the server was started with --open on port 5194.
 - Validation: npm test 194 pass, npm run check ok.
+
+crew-orch 2026-11-14: rebased, npm test 196 pass, fast-forward merged as 1229896 and pushed; restarted 5192 and 5190. Linking commands/crew.md into the user's config waits for the user's go.
 <!-- SECTION:NOTES:END -->
