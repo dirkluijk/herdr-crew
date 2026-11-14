@@ -78,6 +78,8 @@ node <base>/crew.mjs send <agent> '[your-agent-name] <message>' --timeout 110000
 
 `herdr agent prompt` pastes the text and presses Enter. If the user is typing in that agent's input box, your message is glued to their draft and both go out as one. `send` waits until the agent is idle or done and its input box is empty, checks again every 2 seconds, and only then prompts. Exit code 0 means sent. Exit code 2 means it timed out: the reason is on stderr, and you can run the same command again. Exit code 1 means the agent does not exist or the prompt failed. Keep the timeout under your shell tool's limit; the default is 100000 ms. Do not put quotes or apostrophes inside the message.
 
+Never run `/reload` in OpenCode and never send it to another agent, also not in tests. It restarts the OpenCode service that all sessions on the machine share, so agents of every project drop to an empty screen. New sessions pick up changed skills and commands on their own.
+
 ## Persona and tab
 
 Find your persona in `.herdr-crew.json`. Name your Herdr agent `<agent>` and your tab `<agent> (<Name>, <pronouns>)` so the dashboard can match you. Register a missing persona with the `register` command:

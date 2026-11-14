@@ -19,6 +19,7 @@ Agents address each other by Herdr agent name, never by pane ID.
 2. Print `herdr --skill` once if the Herdr skill is not in your context yet, for exact CLI syntax.
 3. Herdr agent names must match `[a-z][a-z0-9_-]{0,31}` and be unique across the whole Herdr server, so also across other projects.
 4. If the project has a `.herdr-crew.json`, also load the `herdr-crew` skill for the crew dashboard, personas and briefing line.
+5. Never run `/reload` in OpenCode and never send it to an agent. It restarts the OpenCode service that all sessions on the machine share, so agents of every project drop to an empty screen. New sessions pick up changed skills and commands on their own. If it happened anyway, restore each affected agent in its own pane: exit OpenCode on an empty input box, then `herdr agent start <name> --kind opencode --pane <pane> -- --session <ses_id>` with the session id from `herdr agent list`. Do this for agents of other projects only with the user's go.
 
 ## Orchestrator
 
