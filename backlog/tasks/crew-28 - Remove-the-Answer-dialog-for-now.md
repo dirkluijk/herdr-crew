@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@m5-panels'
 created_date: '2026-11-14 12:58'
-updated_date: '2026-11-14 13:08'
+updated_date: '2026-11-14 13:09'
 labels:
   - ui
   - actions
@@ -37,6 +37,8 @@ Remove the Answer button and modal (openAnswer, KEY_LABELS, .keys and .seq CSS),
 
 <!-- SECTION:NOTES:BEGIN -->
 Commit 2bb77bd on feat/panels. Removed: Answer button and dialog, keys and type actions, DIALOG_KEYS, HERDR map entries read, keys (agent send-keys), type (pane send-text) and the now unused get, currentStatus, GET /api/agents/<id>/screen, locale keys ui.answer, ui.dialogTitle, ui.dialogHint, ui.ownAnswer, ui.keysLbl, ui.textLbl. Kept: the screen read in lib/crew.mjs for the 🖥 fallback bubble and the blocked status. New: ui.blockedHint on blocked cards (⚠ waits on a question or permission dialog, use Go to and answer it in Herdr), Go to highlighted (urgent) for blocked agents, ui.chatBlocked now points to Go to. POST keys, type, screen and other unknown agent actions answer 404 through the allowlist. Decision recorded in PLAN (2026-11-14): the dashboard no longer types into agents except plain chat prompts and the confirmed onboarding, panel and language requests; a better Answer dialog can return as a new task. README Safeguards sentence replaced (small edit). Validation: npm test 175/175, npm run check ok, page script syntax ok; server test with a blocked stub agent: keys, type, screen, zoom 404, GET screen not 200, no send-keys, send-text or pane zoom calls, page without Answer code, actions.mjs without send-keys or send-text. Manual: stub instance on 5277 with a blocked agent: hint shown, Ga naar highlighted, no Answer button, chat placeholder points to Ga naar.
+
+crew-orch 2026-11-14: rebased, npm test 186 pass, no send-keys, send-text or screen endpoint left; fast-forward merged and pushed; restarted 5192 and 5190.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
