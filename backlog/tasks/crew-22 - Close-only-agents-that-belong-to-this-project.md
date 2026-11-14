@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@m5-panels'
 created_date: '2026-11-14 12:57'
-updated_date: '2026-11-14 13:03'
+updated_date: '2026-11-14 13:04'
 labels:
   - actions
   - security
@@ -40,6 +40,8 @@ Found in the CREW-20 end to end check: a test dashboard for another project offe
 
 <!-- SECTION:NOTES:BEGIN -->
 Commit 09d9df8 on feat/panels. Decision on other projects: agents of another project in the same Herdr workspace stay visible (useful context) with an ander project / other project badge and a tooltip, only Go to, no chat, and they are left out of New on board and the onboarding banner (before, they counted as new agents to onboard, which is how crew-orch showed up in the CREW-20 test). Server refuses prompt, register, onboard and close for them with 409 (another project); focus still works. Registered personas are always this project, also with a cwd outside: they are not marked other project, but Close is still refused for them by the cwd rule. Stub herdr now answers agent get for extra agents by pane. Validation: npm test 175/175, npm run check ok; unit tests for the cwd refusal (outside, unknown folder) and inRoots; server test with x-other (other folder) and x-own (project/docs) in the same workspace: flags, 409 for close, prompt, register and onboard on x-other with no tab close and no persona written, focus 200, and x-own (unregistered, own project) closes with stored false. Manual: stub instance on 5277, cards selected by agent id: x-other shows ander project with only Ga naar and no chat; m9-probe keeps Informeer and Sluiten.
+
+crew-orch 2026-11-14: rebased, npm test 175 pass, fast-forward merged as 75e9a08 and pushed; restarted 5192 and 5190. On 5190 all live other-project agents (including those in platform-m2) are own project; canClose true for idle non-lead agents.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
