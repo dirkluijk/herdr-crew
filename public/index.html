@@ -131,6 +131,7 @@
   .actions button { padding: 0.25rem 0.7rem; border-radius: 99px; border: 1px solid #ffffff22; background: #ffffff0d; color: var(--ink); font-size: 0.8rem; }
   .actions button:hover { background: #ffffff1f; }
   .actions button.urgent { background: var(--blocked); color: var(--bg); font-weight: 700; }
+  .blocked-hint { grid-column: 1 / -1; font-size: 0.85rem; color: var(--blocked); }
   .actions button.welcome { background: var(--accent); color: var(--bg); font-weight: 700; border: 0; }
   .conv { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 0.45rem; }
   .chat { grid-column: 1 / -1; }
@@ -192,12 +193,10 @@
   .langs { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.6rem 0; }
   .langs label { font-size: 0.95rem; color: var(--ink); }
   .row { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap; }
-  .row button, .keys button { padding: 0.4rem 0.9rem; border-radius: 10px; border: 1px solid #ffffff26; background: #ffffff12; color: var(--ink); }
+  .row button { padding: 0.4rem 0.9rem; border-radius: 10px; border: 1px solid #ffffff26; background: #ffffff12; color: var(--ink); }
   .row button.primary { background: var(--idle); color: var(--bg); font-weight: 700; border: 0; }
   .row button.danger { background: var(--blocked); color: var(--bg); font-weight: 700; border: 0; }
   .row button:disabled { opacity: 0.4; }
-  .keys { display: flex; gap: 0.35rem; flex-wrap: wrap; margin: 0.6rem 0; }
-  .seq { font-family: ui-monospace, monospace; min-height: 1.5rem; color: var(--done); }
   .warn { color: var(--done); margin: 0.4rem 0; }
   .err { color: var(--blocked); margin-top: 0.5rem; min-height: 1.2rem; }
   .hint { color: var(--muted); font-size: 0.85rem; }
@@ -462,10 +461,10 @@ function actionsRow(a, st) {
   const id = esc(a.id);
   if (a.otherProject) return `<div class="actions"><button data-act="focus" data-id="${id}">${h("ui.goTo")}</button></div>`;
   return `<div class="actions">
-    <button data-act="focus" data-id="${id}">${h("ui.goTo")}</button>
+    ${st === "blocked" ? `<div class="blocked-hint">${h("ui.blockedHint", { name: a.name })}</div>` : ""}
+    <button data-act="focus" data-id="${id}" class="${st === "blocked" ? "urgent" : ""}">${h("ui.goTo")}</button>
     ${!a.lead && !a.mascot && (a.isNew || !a.registered) ? `<button data-act="onboard" data-id="${id}" class="welcome">${h("ui.inform")}</button>` : ""}
     ${!a.registered ? `<button data-act="register" data-id="${id}">${h("ui.register")}</button>` : ""}
-    ${st === "blocked" ? `<button data-act="answer" data-id="${id}" class="urgent">${h("ui.answer")}</button>` : ""}
     ${a.canClose ? `<button data-act="close" data-id="${id}">${h("ui.closeBtn")}</button>` : ""}
   </div>`;
 }
@@ -700,26 +699,6 @@ function openRegister(a) {
   };
 }
 
-const KEY_LABELS = { up: "↑", down: "↓", left: "←", right: "→", enter: "Enter", esc: "Esc", tab: "Tab", space: "Space" };
-async function openAnswer(a) {
-  const keys = [];
-  showModal(`<h3>${esc(tx("ui.dialogTitle", { name: a.name }))}</h3><pre class="dlg">${h("ui.loading")}</pre><p class="hint">${h("ui.dialogHint")}</p>
-    <div class="keys">${[...Object.keys(KEY_LABELS), "1", "2", "3", "4", "5", "6", "7", "8", "9"].map((k) => `<button data-key="${k}">${KEY_LABELS[k] ?? k}</button>`).join("")}</div>
-    <div class="seq"></div><input type="text" maxlength="4000" placeholder="${esc(tx("ui.ownAnswer"))}">
-    <div class="row"><button data-close>${h("ui.cancel")}</button><button data-clear>${h("ui.clear")}</button><button class="primary" data-next>${h("ui.next")}</button></div>`);
-  const seq = modal.querySelector(".seq");
-  modal.querySelectorAll("[data-key]").forEach((b) => (b.onclick = () => { if (keys.length < 10) keys.push(b.dataset.key); seq.textContent = keys.map((k) => KEY_LABELS[k] ?? k).join("  "); }));
-  modal.querySelector("[data-clear]").onclick = () => { keys.length = 0; seq.textContent = ""; };
-  modal.querySelector("[data-next]").onclick = () => {
-    const text = modal.querySelector("input").value;
-    const base = `api/agents/${encodeURIComponent(a.id)}`;
-    if (text.trim()) return confirmStep(a, tx("ui.textLbl"), text, () => api(`${base}/type`, { confirmed: true, text }));
-    if (keys.length) return confirmStep(a, tx("ui.keysLbl"), keys.map((k) => KEY_LABELS[k] ?? k).join("  "), () => api(`${base}/keys`, { confirmed: true, keys: [...keys] }));
-  };
-  try { modal.querySelector(".dlg").textContent = (await api(`api/agents/${encodeURIComponent(a.id)}/screen`)).text.split("\n").slice(-30).join("\n"); }
-  catch (e) { modal.querySelector(".dlg").textContent = e.message; }
-}
-
 function openTheme() {
   const t = config.theme;
   showModal(`<h3>${h("ui.themeTitle")}</h3><p>${t ? tb("ui.themeNow", { name: t.name }) : esc(tx("ui.themeDefault"))}${t?.prompt ? ` <span class="hint">(${esc(t.prompt)})</span>` : ""}</p>
@@ -842,7 +821,6 @@ document.addEventListener("click", async (ev) => {
   const a = t.dataset.id && agentById(t.dataset.id);
   if (!a) return;
   const act = t.dataset.act;
-  if (act === "answer") return openAnswer(a);
   if (act === "close") return confirmAction(tx("ui.closeTitle", { name: a.name }), tx(a.registered ? "ui.closeText.registered" : "ui.closeText.unregistered", { name: a.name, id: a.id, pane: a.pane }), tx("ui.closeBtn"), async () => {
     await api(`api/agents/${encodeURIComponent(a.id)}/close`, { confirmed: true });
     showToast(tx("ui.closedToast", { name: a.name }));

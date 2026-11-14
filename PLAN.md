@@ -47,7 +47,7 @@ The page updates cards by key: only cards whose data changed are rebuilt, so hov
 Its snapshot includes status, the agent's own say-token bubble, screen fallback, last incoming message and sender, context use, new or unregistered agents, and mascots.
 `lib/screen.mjs`: ANSI stripping, secret redaction, and OpenCode screen parsing; it distinguishes tool blocks from user prompts by border colour in the ANSI visible read (`herdr agent read --source visible --format ansi`), ignores blocks cut off at the top of the viewport, and detects drafts in the OpenCode input box (`inputDraft`).
 `lib/actions.mjs`: Host and Origin checks, fixed Herdr command map through `execFile`, action endpoints, and `actions.log`; dashboard prompts and onboarding refuse to submit into a draft (409), and Go to (focus) is logged and returns `terminalApp` and `raised`.
-Agent actions include focus, prompt, dialog keys or text (with the screen read for the Answer dialog), onboarding, registration, close, and reopen.
+Agent actions include focus, prompt, onboarding, registration, close, and reopen.
 It also handles the crew onboarding endpoint.
 `lib/onboarding.mjs`: persona validation, `registerPersona` (add or update only the supplied fields), and onboarding messages sent through the orchestrator or directly to an agent.
 `lib/summary.mjs`: optional two-paragraph lead-persona summary through an Anthropic-compatible Messages API, with thinking off.
@@ -118,6 +118,7 @@ Each decision below was made on 2026-11-13.
 2026-11-13: Never submit a prompt into a draft: agents and the dashboard wait for idle or done and an empty input box; the small race between check and send is accepted (CREW-10).
 2026-11-13: Poll every second while a browser is connected, poll right after actions, follow Backlog.md with `--watch`, and send and redraw only what changed (CREW-11).
 2026-11-13: Render Backlog.md tasks in the dashboard modal from the stable JSON output instead of linking to backlog browser (CREW-13).
+2026-11-14: Remove the Answer dialog with its keys and type actions (herdr agent send-keys, herdr pane send-text): the dashboard no longer types into agents except plain chat prompts and the confirmed onboarding, panel and language requests. Blocked cards point to Go to. It can come back later as a new task with a better UX (CREW-28).
 
 ## History
 

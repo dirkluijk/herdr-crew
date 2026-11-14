@@ -146,7 +146,6 @@ const POSTS = [
   ["/api/crew/onboard", { confirmed: true }],
   ["/api/agents/m9-probe/prompt", { text: "hello", confirmed: true }],
   ["/api/agents/m9-probe/register", { name: "X", confirmed: true }],
-  ["/api/agents/m9-probe/keys", { keys: ["enter"], confirmed: true }],
   ["/api/agents/m9-probe/close", { confirmed: true }],
   ["/api/agents/m9-gone/reopen", { confirmed: true }],
   ["/api/widgets/probe/poke", { confirmed: true }],
@@ -178,8 +177,6 @@ test("dashboard: actions without confirmed: true get 400", async () => {
     ["/api/crew/onboard", {}],
     ["/api/agents/m9-probe/register", { name: "X" }],
     ["/api/agents/m9-probe/onboard", {}],
-    ["/api/agents/m9-probe/keys", { keys: ["enter"], confirmed: 1 }],
-    ["/api/agents/m9-probe/type", { text: "y" }],
     ["/api/widgets/probe/poke", {}],
     ["/api/widgets/probe/poke", { confirmed: "yes" }],
     ["/api/agents/m9-probe/close", {}],
@@ -674,19 +671,21 @@ test("reopen: refused for a live agent, then starts the stored session in a new 
   await writeConfig({ personas: cfg.personas });
 });
 
-test("agents: Zoom and Screen are gone, the Answer dialog still reads the screen", async () => {
-  for (const action of ["zoom", "screen", "nope"]) {
-    const r = await api(`/api/agents/m9-probe/${action}`, { method: "POST", headers: ok(), body: { confirmed: true } });
+test("agents: Zoom, Screen and the Answer dialog are gone; the dashboard only types plain chat prompts", async () => {
+  await herdrState({ status: "blocked" });
+  assert.ok(await until(async () => JSON.parse((await api("/api/agents")).text).agents.find((a) => a.id === "m9-probe").status === "blocked"));
+  for (const [action, body] of [["zoom", {}], ["screen", {}], ["keys", { keys: ["enter"] }], ["type", { text: "y" }], ["nope", {}]]) {
+    const r = await api(`/api/agents/m9-probe/${action}`, { method: "POST", headers: ok(), body: { confirmed: true, ...body } });
     assert.equal(r.status, 404, action);
   }
-  assert.deepEqual((await herdrCalls()).filter((a) => a[0] === "pane" && a[1] === "zoom"), []);
-  await writeFile(screenFile, "line one\nline two\n");
-  const r = await api("/api/agents/m9-probe/screen");
-  assert.equal(r.status, 200);
-  assert.match(JSON.parse(r.text).text, /line two/);
+  assert.notEqual((await api("/api/agents/m9-probe/screen")).status, 200);
+  assert.deepEqual((await herdrCalls()).filter((a) => (a[0] === "pane" && ["zoom", "send-text"].includes(a[1])) || (a[0] === "agent" && a[1] === "send-keys")), []);
+  await herdrState({});
   const page = (await api("/")).text;
-  assert.doesNotMatch(page, /data-act="zoom"|data-act="screen"|openScreens|⤢ Zoom|▤ Scherm|▤ Screen/);
-  assert.match(page, /api\/agents\/\$\{encodeURIComponent\(a\.id\)\}\/screen/);
+  assert.doesNotMatch(page, /data-act="zoom"|data-act="screen"|data-act="answer"|openScreens|openAnswer|KEY_LABELS|\/keys|\/type|\/screen/);
+  assert.match(page, /ui\.blockedHint/);
+  const src = await readFile(join(APP, "lib", "actions.mjs"), "utf8");
+  assert.doesNotMatch(src, /send-keys|send-text/);
 });
 
 test("language: the page gets the locale; the picker writes language after confirmation and keeps the bubble language", async () => {
