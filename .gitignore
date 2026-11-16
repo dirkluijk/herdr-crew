@@ -1,2 +1,4 @@
 node_modules/
 .herdr-crew/
+.herdr-crew.json
+PLAN.local.md

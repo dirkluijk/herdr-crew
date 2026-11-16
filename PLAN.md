@@ -12,23 +12,13 @@ Development used Node 24.
 ## Status (as of 2026-11-13)
 
 Version: `0.1.0`.
-Local repository: `~/workspace/herdr-crew`, branch `main`, remote `origin` at https://github.com/dirkluijk/herdr-crew (private).
-The running instance serves `~/workspace/other-project` at http://localhost:5190.
-Its files origin is http://localhost:5191.
-It runs in Herdr pane `w2B:p11` in that workspace.
-Its config is `~/workspace/other-project/.herdr-crew.json`.
-The config has more than 15 personas, the Night theme, a links widget named `deck`, and a dev-server widget named `docs-pushed`.
-That instance belongs to other-project. Do not reconfigure it from this repo.
-The herdr-crew orchestrator may restart it after a merge into main, with the command in that pane plus `--no-prompt`, and reports each restart to the user (user decision 2026-11-13).
-The older dashboard is still in `other-project/dashboard/` on port `5180`.
-Pixel built that project-specific dashboard; it is not maintained here.
+Local repository: `~/workspace/herdr-crew`, branch `main`, remote `origin` at https://github.com/dirkluijk/herdr-crew (public since 2026-11-16).
+Dashboards of other local projects can run from this checkout. Their locations, panes and restart commands are in `PLAN.local.md`, which is not in git; restart them only after a merge into main and report each restart to the user (user decision 2026-11-13).
 The skill is installed as a symlink: `~/.config/opencode/skills/herdr-crew` points to `skills/herdr-crew` in this checkout, so skill changes are live without copying.
 Agents run the CLI through `node <skill base directory>/crew.mjs`, a launcher that reaches `server.mjs` through the symlink; it needs the symlink install and does not work under `node --preserve-symlinks-main`.
 The herdr-orchestrator skill and the orchestrate command live in this repo (`skills/herdr-orchestrator`, `commands/`) and are installed as symlinks with `node server.mjs install` (done on 2026-11-14 with --force; the old copies are in `~/.config/opencode/herdr-crew-backup/`). The orchestrator skill has Prerequisites step 4 to load the herdr-crew skill when a project has `.herdr-crew.json`, a crew line in the briefing template, and uses the herdr-crew send command for reports, briefings, and follow-up work when herdr-crew is in use.
-Milestone agent `x-crewkit` (persona Rosa) built this under orchestrator Vera in the other-project workspace.
-This repo has its own crew: orchestrator `crew-orch` (persona Noor) in Herdr workspace `w2G`, config `.herdr-crew.json`, avatars in `avatars/`.
-Its dashboard runs at http://localhost:5192 (files origin 5193) in Herdr pane `w2G:p4`.
-The test suite has 110 `node:test` tests (`npm test`) and no dependencies.
+This repo has its own crew: orchestrator `crew-orch` (persona Noor), avatars in `avatars/`. Its `.herdr-crew.json` is local and not in git; workspace, pane and port are in `PLAN.local.md`.
+The test suite has about 200 `node:test` tests (`npm test`) and no dependencies.
 
 ## Architecture (file map)
 
@@ -122,19 +112,7 @@ Each decision below was made on 2026-11-13.
 
 ## History
 
-The earlier work is in `~/workspace/other-project` under Backlog.md prefix `STS`.
-From that directory, read a task with `backlog task view STS-<n> --plain`.
-
-STS-12: Bram's first dashboard exploration, closed as future work.
-STS-46: Pixel's original dashboard in `other-project/dashboard/`, with personas, avatars, statuses, and bubbles.
-STS-47: Herdr buttons, safeguards, and the self-written bubble via the say token.
-STS-48: mascot persona Bertus Hazelaar.
-STS-49: docs server widget for pushed docs.
-STS-51: docs server widget for live docs.
-STS-54: extraction to this repo, including the generic app, init and register, orchestrator onboarding, prompted themes, skill draft, and avatar decision. Its implementation notes contain verification details.
-STS-55: links widget with read-only local files.
-STS-56: drag and pin cards with a layout per dashboard instance.
-STS-57: this handover.
+herdr-crew started as a project specific dashboard in another local project and was extracted into this repo on 2026-11-13. That earlier history (personas, safeguards, widgets, drag and pin) lives in the other project's Backlog.md; `PLAN.local.md` says where.
 
 ## Open work
 
